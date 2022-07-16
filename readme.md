@@ -7,7 +7,7 @@ It aims to be a slim frontend for file and content search with the heavy lifting
 This project started out to evaluate the maturity of some GUI frameworks in rust. See further down for comments on the GUIs.
 Each GUI has its own branch. Currently main branch is Druid.
 
-Why rusl? Well, its the sound made when you are searching through leaves or papers for something. Also its 75% of the letters in rust!
+Why the name rusl? Well, its the sound made when you are searching through leaves or papers for something. Also its 75% of the letters in rust!
 
 ## Objectives
 - [X] File name search
