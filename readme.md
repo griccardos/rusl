@@ -5,26 +5,27 @@ Rust GUI interface for ripgrep / file searcher / content searcher
 It aims to be a slim frontend for file and content search with the heavy lifting done by ripgrep and other libraries
 
 This project started out to evaluate the maturity of some GUI frameworks in rust. See further down for comments on the GUIs.
-Saved each GUI in its own branch. Currently master is Druid
+Each GUI has its own branch. Currently main branch is Druid.
 
+Why rusl? Well, its the sound made when you are searching through leaves or papers for something. Also its 75% of the letters in rust!
 
 ## Objectives
-- [x] File name search
-- [x]  File content search (currently only first match is shown)
-- [x] Combination of the above 2
-- [x] Highlight match in both name and content
-- [x] GUI
-- [x] Export results to clipboard
+- [X] File name search
+- [X]  File content search (currently only first match is shown)
+- [X] Combination of the above 2
+- [X] Highlight match in both name and content
+- [X] GUI
+- [X] Export results to clipboard
 - [ ] Cross platform tested
-    - [x] Windows 10
-    - [x] Arch Linux
+    - [X] Windows 10
+    - [X] Arch Linux
     - [ ] OSX
 - [ ] Click on individual result to copy to clipboard
 - [ ] Option to show all content matches in a file
 - [ ] Alternate GUI libraries 
-    - [x] Druid
-    - [x] Slint
-    - [x] EGUI
+    - [X] Druid
+    - [X] Slint
+    - [X] EGUI
     - [ ] Dioxus
 
 This project relies heavily on ripgrep and BurntSushi's libraries. 
