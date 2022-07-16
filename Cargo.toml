@@ -1,0 +1,25 @@
+[package]
+name = "rusl"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+regex = "1.5.6"
+num_cpus = "1.13"
+grep = "0.2.8" #ripgrep
+ignore = "0.4.18" #parallel walker from ripgrep
+walkdir = "2.2.7" #walker from ripgrep
+clipboard = "0.5.0" #for clipboard
+dirs = "4.0.0" #for getting config file
+serde = { version="1.0.137", features=["derive"]}  #save config
+toml = "0.5.9" #config format
+
+#slint
+slint = "0.2.4" #GUI
+
+[build-dependencies]
+slint-build = "0.2.4" #slint GUI
+
+
+
