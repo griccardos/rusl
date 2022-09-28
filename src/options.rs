@@ -49,7 +49,7 @@ impl Default for Sort {
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum FTypes {
     Files,
     Directories,

@@ -75,9 +75,6 @@ impl Manager {
         self.spawn_search(search, self.internal_sender.clone(), self.options.clone(), self.id);
     }
 
-    pub fn save(&mut self) {
-        save_settings(&mut self.options);
-    }
     pub fn save_and_quit(&mut self) {
         save_settings(&mut self.options);
         self.internal_sender.send(Message::Quit).expect("Quit");
