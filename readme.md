@@ -16,10 +16,10 @@ Why the name rusl? Well, its the sound made when you are searching through leave
 - [X] Highlight match in both name and content
 - [X] GUI
 - [X] Export results to clipboard
-- [ ] Cross platform tested
+- [X] Cross platform tested
     - [X] Windows 10
     - [X] Arch Linux
-    - [ ] OSX
+    - [X] OSX
 - [ ] Click on individual result to copy to clipboard
 - [ ] Option to show all content matches in a file
 - [ ] Alternate GUI libraries 
@@ -27,6 +27,9 @@ Why the name rusl? Well, its the sound made when you are searching through leave
     - [X] Slint
     - [X] EGUI
     - [ ] Dioxus
+    - [ ] fltk
+    - [ ] Relm4
+    - [ ] Iced
 
 This project relies heavily on ripgrep and BurntSushi's libraries. 
 > Shout out to BurntSushi for the awesome work (https://github.com/BurntSushi)  
