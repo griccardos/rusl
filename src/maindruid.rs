@@ -115,7 +115,7 @@ fn ui_builder() -> impl Widget<AppState> {
         .on_click(|ctx, _data, _env| ctx.submit_command(EXPORT))
         .fix_size(80., 40.);
     let lmessage = RawLabel::new().lens(AppState::message).padding(5.0).center().expand_width();
-    let butfolder = Button::new("🗀")
+    let butfolder = Button::new("📁")
         .on_click(|_ctx, data: &mut AppState, _env| {
             if let Some(folder) = rfd::FileDialog::new().pick_folder() {
                 data.dir = folder.to_string_lossy().to_string();
@@ -123,9 +123,14 @@ fn ui_builder() -> impl Widget<AppState> {
         })
         .fix_size(40., 40.);
 
-    let list = Scroll::new(List::new(RawLabel::new).padding(5.0).lens(AppState::visible).padding(10.))
-        .background(Color::rgba8(50, 50, 50, 255))
-        .expand();
+    let list = Scroll::new(
+        List::new(|| RawLabel::new().padding(1.0))
+            .padding(5.0)
+            .lens(AppState::visible)
+            .padding(10.),
+    )
+    .background(Color::rgba8(50, 50, 50, 255))
+    .expand();
 
     Flex::column()
         .with_child(
@@ -276,7 +281,7 @@ impl AppDelegate<AppState> for Delegate {
 
             if let SearchResult::InterimResult(fi) = results {
                 if data.visible.len() < MAX_OUT {
-                    let sym = if fi.is_folder { "🗀" } else { "📝" };
+                    let sym = if fi.is_folder { "📁" } else { "📝" };
                     let string = format!("{} {}> {}", sym, fi.path.clone(), fi.content.trim());
                     data.visible.push_back(RichText::new(string.into()));
                     //TODO this takes long. fix
@@ -345,9 +350,10 @@ fn highlight_result(x: &FileInfo, re_name: Result<Regex, regex::Error>, re_conte
     full.push_str(&x.path);
     let mut rich = if !x.content.is_empty() {
         full.push_str("> ");
+        let start = full.len();
         full.push_str(x.content.trim());
         let mut rich = rich(&full, Color::WHITE);
-        rich.add_attribute(x.path.len() + 2..full.len(), Attribute::text_color(Color::rgb8(50, 255, 55)));
+        rich.add_attribute(start..full.len(), Attribute::text_color(Color::rgb8(50, 255, 55)));
         rich.add_attribute(0..symlen, Attribute::FontFamily(FontFamily::MONOSPACE));
         rich
     } else {
