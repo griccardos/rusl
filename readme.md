@@ -7,7 +7,7 @@ It aims to be a slim frontend for file and content search with the heavy lifting
 This project started out to evaluate the maturity of some GUI frameworks in rust. See further down for comments on the GUIs.
 Each GUI has its own branch. Currently main branch is Druid.
 
-Why the name rusl? Well, its the sound made when you are searching through leaves or papers for something. Also its 75% of the letters in rust!
+Why the name rusl? Well, it's the sound made when you are searching through leaves or papers for something. Also it's 75% of the letters in rust!
 
 ## Objectives
 - [X] File name search
@@ -29,7 +29,7 @@ Why the name rusl? Well, its the sound made when you are searching through leave
     - [ ] Dioxus
     - [ ] fltk
     - [ ] Relm4
-    - [ ] Iced
+    - [X] Iced
 
 This project relies heavily on ripgrep and BurntSushi's libraries. 
 > Shout out to BurntSushi for the awesome work (https://github.com/BurntSushi)  
@@ -38,7 +38,40 @@ This project relies heavily on ripgrep and BurntSushi's libraries.
 Contributions are welcome. You are also welcome to add a new GUI frontend in a new branch. 
 
 ## GUI Libraries
-As stated, this was a small project to test out some of the existing libraries.
+Each library is on a different branch. Change branch to select different UI.
+
+Summary
+----------
+|                       |Druid   |Slint|EGUI  |ICED   |
+|-                      |---:    |----:|---:  |----:  |
+|Dependencies           |**171** |439  |243   |312    |
+|Build time cold (s)    |18      |40   |**16**|42     |
+|Lines                  |403     |479  | 229  |**198**|
+|File size windows (kb) |**4739**|6926 |7071  |10276  |
+
+UI 
+--------
+|                       |Druid  |Slint  |EGUI   |ICED   |
+|-                      |:-----:|:-----:|:-----:|:-----:|
+| - Toolbar icon        |&check;|&check;|&check;|&check;|
+| - Window icon         |&cross;|&check;|&check;|&check;| 
+| - Tab between fields  |&check;|&check;|&check;|&cross;| 
+| - paste into textbox  |&check;|&check;|&check;|&check;| 
+
+Functionality Implemented 
+--------
+|                       |Druid|Slint|EGUI|ICED|
+|-                      |:-----:|:---:  |:--:   |:---:  |
+| - Filename search     |&check;|&check;|&check;|&check;|
+| - Content search      |&check;|&check;|&check;|&check;| 
+| - Match Highlighting  |&check;|&cross;|&cross;|&cross;| 
+| - Settings            |&check;|&check;|&check;|&cross;| 
+| - Copy to clipboard   |&check;|&check;|&check;|&cross;| 
+| - Windows             |&check;|&check;|&check;|&check;| 
+| - Linux               |&check;|issues |       |       | 
+| - Mac                 |&check;|       |       |       | 
+
+
 
 ### Slint 
 This project started off using Slint (https://slint-ui.com/). It was really easy to get up and running and within 2 days had something relatively complete (with a few concessions made). 
@@ -108,5 +141,17 @@ My favourite in terms of getting something up and running fast with almost all f
 - Less native looking than others
 - Repaints everything each time (may or may not be an issue, was not an issue here)
 
----
 
+### ICED
+(https://github.com/iced-rs/iced)
+Nice library using Elm framework. Easy to get up and running. Uses winit for window, so one can set the icon for window itself in Windows
+
+#### Pros
+- Fast to develop something
+- Easy to understand
+- Title bar icon
+- Dark/light mode
+- Nice hover over effects
+#### Cons
+- Less native looking than others
+- Cannot send message to update GUI easily. Currently using Subscriber to poll changes which is less than optimal
