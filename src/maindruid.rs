@@ -2,10 +2,11 @@ use std::{sync::mpsc, thread::spawn, time::Instant};
 
 use druid::{
     im::Vector,
+    piet::TextStorage,
     text::{Attribute, RichText},
     widget::{Button, Checkbox, Controller, Either, Flex, Label, List, RawLabel, Scroll, TextBox},
-    AppDelegate, AppLauncher, Code, Color, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, Lens, Selector, Target, Widget, WidgetExt,
-    WindowDesc,
+    AppDelegate, AppLauncher, Code, Color, Command, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, Lens, Selector, Target, Widget,
+    WidgetExt, WindowDesc,
 };
 use regex::{Regex, RegexBuilder};
 
@@ -20,6 +21,7 @@ pub const STOP: Selector = Selector::new("stop");
 pub const RESULTS: Selector<SearchResult> = Selector::new("results");
 pub const UPDATEMESSAGE: Selector<String> = Selector::new("message");
 pub const EXPORT: Selector = Selector::new("export");
+pub const EXPORTSINGLE: Selector<String> = Selector::new("exportsingle");
 
 #[derive(Data, Clone, Lens)]
 struct AppState {
@@ -111,9 +113,9 @@ fn ui_builder() -> impl Widget<AppState> {
     let butset = Button::new("⚙️")
         .on_click(|_ctx: &mut EventCtx, data: &mut AppState, _env: &Env| data.show_settings = !data.show_settings)
         .fix_size(40., 40.);
-    let butclip = Button::new("Export")
+    let butclip = Button::new("Clipboard")
         .on_click(|ctx, _data, _env| ctx.submit_command(EXPORT))
-        .fix_size(80., 40.);
+        .fix_size(85., 40.);
     let lmessage = RawLabel::new().lens(AppState::message).padding(5.0).center().expand_width();
     let butfolder = Button::new("📁")
         .on_click(|_ctx, data: &mut AppState, _env| {
@@ -124,10 +126,19 @@ fn ui_builder() -> impl Widget<AppState> {
         .fix_size(40., 40.);
 
     let list = Scroll::new(
-        List::new(|| RawLabel::new().padding(1.0))
-            .padding(5.0)
-            .lens(AppState::visible)
-            .padding(10.),
+        List::new(|| {
+            RawLabel::new().padding(1.0).on_click(|ctx, data: &mut RichText, _env| {
+                let mut filename = data.as_str().split_once(' ').unwrap().1;
+                if filename.contains('>') {
+                    //if we are showing content too...
+                    filename = filename.split_once('>').unwrap().0;
+                }
+
+                ctx.submit_command(Command::new(EXPORTSINGLE, filename.to_string(), Target::Auto))
+            })
+        })
+        .lens(AppState::visible)
+        .padding(10.),
     )
     .background(Color::rgba8(50, 50, 50, 255))
     .expand();
@@ -191,34 +202,15 @@ impl Controller<String, TextBox<String>> for TextBoxController {
         }
         child.event(ctx, event, data, env)
     }
-
-    fn lifecycle(&mut self, child: &mut TextBox<String>, ctx: &mut druid::LifeCycleCtx, event: &druid::LifeCycle, data: &String, env: &Env) {
-        child.lifecycle(ctx, event, data, env)
-    }
-
-    fn update(&mut self, child: &mut TextBox<String>, ctx: &mut druid::UpdateCtx, old_data: &String, data: &String, env: &Env) {
-        child.update(ctx, old_data, data, env)
-    }
 }
 
 pub struct Delegate {
     manager: Manager,
 }
 impl AppDelegate<AppState> for Delegate {
-    fn event(
-        &mut self,
-        _ctx: &mut druid::DelegateCtx,
-        _window_id: druid::WindowId,
-        event: druid::Event,
-        _data: &mut AppState,
-        _env: &druid::Env,
-    ) -> Option<druid::Event> {
-        Some(event)
-    }
-
     fn command(
         &mut self,
-        _ctx: &mut druid::DelegateCtx,
+        ctx: &mut druid::DelegateCtx,
         _target: druid::Target,
         cmd: &druid::Command,
         data: &mut AppState,
@@ -273,6 +265,13 @@ impl AppDelegate<AppState> for Delegate {
 
         if cmd.is(EXPORT) {
             self.manager.export(data.data.iter().map(|x| x.to_string()).collect());
+            ctx.submit_command(Command::new(UPDATEMESSAGE, "Copied to clipboard".to_string(), Target::Auto));
+            return Handled::Yes;
+        }
+        if let Some(line) = cmd.get(EXPORTSINGLE) {
+            self.manager.export(vec![line.clone()]);
+            ctx.submit_command(Command::new(UPDATEMESSAGE, "Copied to clipboard".to_string(), Target::Auto));
+
             return Handled::Yes;
         }
 
@@ -324,16 +323,6 @@ impl AppDelegate<AppState> for Delegate {
         }
 
         druid::Handled::No
-    }
-
-    fn window_added(
-        &mut self,
-        _id: druid::WindowId,
-        _handle: druid::WindowHandle,
-        _data: &mut AppState,
-        _env: &druid::Env,
-        _ctx: &mut druid::DelegateCtx,
-    ) {
     }
 
     fn window_removed(&mut self, _id: druid::WindowId, _data: &mut AppState, _env: &druid::Env, _ctx: &mut druid::DelegateCtx) {
