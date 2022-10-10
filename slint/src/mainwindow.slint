@@ -1,0 +1,281 @@
+//SLINT COMMENTS:
+// 1. how to import a rust struct?
+// 2. how to change checkbox text colour?
+// 3. how to split out portion of view into a new file, then a. access properties callbacks that are in root from that file or b. access callbacks from rust in the secondary file?
+// 4. cannot set background colour of layouts
+// 5. no tab events
+// 6. No Selectable text without scroll bar or editing
+// 7. no hyperlinks in text
+// 8. how to format slint file
+
+import{LineEdit,CheckBox,ListView,ComboBox,TabWidget,StandardButton ,TextEdit } from "std-widgets.slint";
+
+export struct SFileInfo :={
+    name:string,
+    data:string
+ }
+
+export MainWindow := Window {
+    title: "Rusl";
+    icon: @image-url("icons/icon.png");
+    property <[SFileInfo]> files;
+    property <string> message:"Results";
+    property <string> directory:".";
+    property <int> tab_height:80;
+    property <bool> show_options;
+    property <bool> export_enabled:false;
+    property <string>selected_sort:"Path";
+    property <bool> error_dir:false;
+
+    callback sort_changed();
+    callback search();
+    callback export(int);
+    callback dir_changed();
+
+    forward-focus: edit;
+
+    //for files
+    property <string> find_text;
+    property <bool>case_sensitive;
+    property <string>selected_ftypes:"All";
+
+    //for contents
+    property <string> content_find_text;
+    property <bool>content_case_sensitive;
+
+    property <int>tindex;
+
+    
+    preferred-width: 1000px;
+    preferred-height: 800px;
+    min-width: 500px;
+    default-font-size: 18px;
+    default-font-weight: 200;
+    background: #1F1B24;
+    VerticalLayout { 
+        padding: 5px;
+        spacing: 20px;
+        
+        TabWidget { 
+            height: tab_height*1px;
+            current-index<=>tindex;
+            Tab{
+                title: root.find-text==""?"Name":"Name*";
+                Rectangle { 
+                    background: #2a2a2a;
+                    height: 400px;
+                        HorizontalLayout {
+                            y:10px; 
+                            padding: 10px;
+                            height:50px;
+                            edit:= LineEdit { 
+                                placeholder-text:"File name";
+                        //        border-radius: 8px;
+                                height:40px;
+                                text <=> root.find-text;
+                                accepted => { root.search(); }
+                            }
+                            Rectangle { width:10px; }
+                            StandardButton { 
+                                text: "X";
+                                height: 40px;
+                                clicked => { root.find-text="";  }
+                             }
+                        
+                        }
+                        if show-options:
+                        HorizontalLayout { 
+                            padding: 10px;
+                            y:60px;
+                            Rectangle { 
+                                border-radius: 8px;
+                                background: #ddd;
+                                height: 60px;
+                    
+                                HorizontalLayout { 
+                                    x:20px;
+                                    spacing: 10px;
+                                    CheckBox { 
+                                        text: "Case sensitive";
+                                        checked<=> root.case-sensitive;
+                                    }
+                                    HorizontalLayout { 
+                                        alignment: start;
+                    
+                                        Rectangle { width:20px; }
+                                        Text{ 
+                                            vertical-alignment: center;    
+                                            width:90px;
+                                            text:"File types";
+                                        }
+                                        VerticalLayout { //needed because combobox doesnt have vertical alignment
+                                                alignment: center;
+                                                ComboBox {
+                                                    height: 30px;
+                                                    width: 200px;
+                                                    model: ["All", "Files", "Directories"];
+                                                    current-value<=> root.selected-ftypes;
+                                                }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                       
+                    }
+                    
+            }
+            Tab{
+                title:root.content_find_text==""?"Contents":"Contents*";
+                Rectangle { 
+                    background: #2a2a2a;
+                    height: 400px;
+                    HorizontalLayout { 
+                        padding: 10px;
+                        y:10px;
+                        height:50px;
+                        LineEdit { 
+                            placeholder-text:"Text to find in contents";
+                          //  border-radius: 8px;
+                            height:40px;
+                            text <=> root.content_find_text;
+                            accepted => { root.search(); }
+                
+                        }
+                        Rectangle { width:10px; }
+                        StandardButton { 
+                            text: "X";
+                            height: 40px;
+                            clicked => { root.content-find-text="";   }
+                         }
+                    
+                    }
+                    if show-options:
+                    HorizontalLayout { 
+                        padding: 10px;
+                        y:60px;
+                
+                        Rectangle { 
+                            border-radius: 8px;
+                            background: #ddd;
+                            height: 60px;
+                
+                            HorizontalLayout { 
+                                x:20px;
+                                spacing: 10px;
+                                CheckBox { 
+                                    text: "Case sensitive";
+                                    checked<=> root.content_case_sensitive;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+        }
+        if root.tindex!=2:
+        VerticalLayout { 
+        HorizontalLayout { 
+            padding: 10px;
+            height:50px;
+            Rectangle { 
+            LineEdit { 
+                placeholder-text:"Starting directory (optional)";
+                //border-radius: 8px;
+                height:40px;
+                //background: root.error-dir?#cf7d7d:white;
+                text <=> root.directory;
+                edited => { root.dir-changed();} 
+                accepted => { root.search(); }
+            }
+        }
+            Rectangle { width:10px; }
+            StandardButton { 
+                text: "⚙️";
+                height: 40px;
+                clicked => { root.show-options=!root.show-options;
+                   root.tab-height=root.show-options?150:80;
+                    
+                 }
+             }
+             Rectangle { width:10px; }
+             StandardButton { 
+                 text: "Find";
+                 height: 40px;
+                 clicked => { search();  }
+              }
+        }
+        Rectangle { 
+            padding-left: 10px;
+            height: 80px;
+            
+            VerticalLayout { 
+                alignment: end;
+                x:10px;
+                padding-bottom: 10px;
+            Text { 
+                text:message;
+                color: white;
+                height: 30px;
+                vertical-alignment: center;
+            }
+            }
+        HorizontalLayout { 
+            x:parent.width/2;
+            width: parent.width/2;
+            alignment: end;
+            padding-right: 10px;
+            padding-bottom: 10px;
+            VerticalLayout { 
+                alignment: end;
+            HorizontalLayout { 
+                height: 30px;
+            Text{text:"Sort"; height: 30px; color:white; vertical-alignment: center;}
+            Rectangle { width:10px; }
+            ComboBox {  
+                height: 30px;
+                width: 200px;
+                model: ["Path", "File name", "Extension"];
+                current-value<=> root.selected_sort; 
+                selected => { root.sort_changed(); }
+            }
+            Rectangle { width:10px; }
+            exp:=StandardButton { 
+                text:"Export";
+                enabled<=>root.export_enabled;
+                clicked => { popup.show(); }
+             }
+             
+             popup := PopupWindow {
+                 x:exp.x - 10px;
+                 y:exp.y+exp.height;
+                VerticalLayout {
+                         StandardButton {  text: "Full paths"; clicked => { export(1); } }
+                         StandardButton {   text: "Names"; clicked => { export(2); } }
+                 }
+            }
+        }
+        }}
+        }
+        result_list:=ListView { 
+            //background: #4a4a4a;
+            //border-radius: 8px;
+
+            for f in files: 
+            HorizontalLayout{
+                alignment: start;
+                width: parent.width -20px;
+                
+                    Text{
+                        text:f.name +"> "+f.data;
+                        color: white; 
+                        overflow: elide;
+                    }
+                
+                }
+                
+        }
+    }
+    }
+    }

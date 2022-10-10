@@ -1,13 +1,18 @@
-rusl
+## rusl
 
-Rust GUI interface for ripgrep / file searcher / content searcher
+### Rust GUI interface for ripgrep / file searcher / content searcher
 
-It aims to be a slim frontend for file and content search with the heavy lifting done by ripgrep and other libraries
+rusl aims to be a slim frontend for file and content search with the heavy lifting done by ripgrep and other libraries. This project started out to evaluate the maturity of some GUI frameworks in rust. See further down for comments on the GUIs.
 
-This project started out to evaluate the maturity of some GUI frameworks in rust. See further down for comments on the GUIs.
-Each GUI has its own branch. Currently main branch is Druid.
+Each GUI Can be found in its own folder. To compile, cd into the folder, and cargo build.
+
+Druid is currently the most feature complete and releases are Druid.
 
 Why the name rusl? Well, it's the sound made when you are searching through leaves or papers for something. Also it's 75% of the letters in rust!
+
+![rusl druid](https://user-images.githubusercontent.com/30464685/194580801-74021368-93e4-44e1-b0de-9237bc8a6839.png)
+
+
 
 ## Objectives
 - [X] File name search
@@ -60,7 +65,7 @@ UI
 
 Functionality Implemented 
 --------
-|                       |Druid|Slint|EGUI|ICED|
+|                       |Druid  |Slint  |EGUI   |ICED   |
 |-                      |:-----:|:---:  |:--:   |:---:  |
 | - Filename search     |&check;|&check;|&check;|&check;|
 | - Content search      |&check;|&check;|&check;|&check;| 

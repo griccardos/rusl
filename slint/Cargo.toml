@@ -1,0 +1,17 @@
+[package]
+name = "rusl"
+version = "0.1.5"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+librusl={path="../librusl"}
+
+#slint
+slint = "0.3.0" #GUI
+
+[build-dependencies]
+slint-build = "0.3.0" #slint GUI
+
+
+

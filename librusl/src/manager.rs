@@ -80,6 +80,10 @@ impl Manager {
         self.internal_sender.send(Message::Quit).expect("Quit");
     }
 
+    pub fn save(&mut self) {
+        save_settings(&mut self.options);
+    }
+
     pub fn dir_is_valid(&self, dir: &str) -> bool {
         PathBuf::from(dir).exists()
     }

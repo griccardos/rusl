@@ -1,6 +1,6 @@
 [package]
 name = "rusl"
-version = "0.1.3"
+version = "0.1.5"
 edition = "2021"
 build = "build.rs"
 description = "search gui"
@@ -8,17 +8,10 @@ description = "search gui"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-regex = "1.6.0" # for pattern matching
-num_cpus = "1.13" # for parallel search
-grep = "0.2.10" #ripgrep
-ignore = "0.4.18" #parallel walker from ripgrep
-walkdir = "2.3.2" #walker from ripgrep
-clipboard = "0.5.0" #for clipboard
-dirs = "4.0.0" #for getting config file
-serde = { version="1.0.145", features=["derive"]}  #save config
-toml = "0.5.8" #config format
+librusl = { path="../librusl"}
 rfd = "0.6" #for selecting directory for gui
 druid  = {  git ="https://github.com/linebender/druid", features=["im"]} #GUI
+regex = "1.6.0"
 
 [build-dependencies]
 embed-resource="1.7.3" #for icon

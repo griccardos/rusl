@@ -1,3 +1,6 @@
+//hide windows console
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::{sync::mpsc, thread::spawn, time::Instant};
 
 use druid::{
@@ -10,7 +13,7 @@ use druid::{
 };
 use regex::{Regex, RegexBuilder};
 
-use crate::{
+use librusl::{
     fileinfo::FileInfo,
     manager::{Manager, SearchResult},
     search::Search,
@@ -43,7 +46,7 @@ struct AppState {
     content_case_sensitive: bool,
 }
 
-pub fn run_druid() {
+pub fn main() {
     let (s, r) = mpsc::channel::<SearchResult>();
     let man = Manager::new(s);
     let ops = &man.options;

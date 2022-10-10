@@ -1,0 +1,22 @@
+[package]
+name = "rusl"
+version = "0.1.5"
+edition = "2021"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+librusl = {path="../librusl"}
+
+#dioxus
+dioxus = { version = "0.2.4", features = ["desktop"] } #GUI
+tokio = "1.19.0" #for dioxus
+futures-channel = "0.3.21" #for dioxus
+
+
+[build-dependencies]
+embed-resource="1.7.2" #for icon
+
+
+
