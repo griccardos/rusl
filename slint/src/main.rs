@@ -135,7 +135,7 @@ fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, res
             .iter()
             .map(|x| SFileInfo {
                 name: x.path.clone().into(),
-                data: x.content.clone().into(),
+                data: x.content().clone().into(),
             })
             .collect();
         let model = VecModel::<SFileInfo>::from(sfiles);

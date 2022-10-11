@@ -100,7 +100,7 @@ impl Application for App {
                     Row::new()
                         .spacing(10)
                         .push(Text::new(&x.path).style(Color::from_rgb8(100, 200, 100)))
-                        .push(Text::new(&x.content).width(Length::Fill))
+                        .push(Text::new(&x.content()).width(Length::Fill))
                         .into()
                 })
                 .collect(),
@@ -168,7 +168,7 @@ impl Application for App {
                             if res.data.len() > 1000 {
                                 self.results.push(FileInfo {
                                     path: format!("...and {} others", res.data.len() - 1000),
-                                    content: "".into(),
+                                    matches: vec![],
                                     ext: "".into(),
                                     name: "".into(),
                                     is_folder: false,

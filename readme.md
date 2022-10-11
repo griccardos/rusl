@@ -24,7 +24,7 @@ Why the name rusl? Well, it's the sound made when you are searching through leav
     - [X] Arch Linux
     - [X] OSX
 - [X] Click on individual result to copy to clipboard
-- [ ] Option to show all content matches in a file
+- [X] Show line matches in a file
 - [ ] Alternate GUI libraries 
     - [X] Druid
     - [X] Slint

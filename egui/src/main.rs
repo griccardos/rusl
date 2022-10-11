@@ -189,8 +189,8 @@ impl AppState {
                 if let Ok(results) = self.results.try_lock() {
                     for r in results.data.iter().take(2000) {
                         ui.label(&r.path);
-                        if !r.content.is_empty() {
-                            ui.label(&r.content);
+                        if !r.content().is_empty() {
+                            ui.label(&r.content());
                         }
                         ui.end_row();
                     }
