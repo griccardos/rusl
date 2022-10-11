@@ -26,6 +26,7 @@ Why the name rusl? Well, it's the sound made when you are searching through leav
     - [X] OSX
 - [X] Click on individual result to copy to clipboard
 - [X] Show line matches in a file
+- [ ] Autocomplete or dropdown history
 - [ ] Alternate GUI libraries 
     - [X] Druid
     - [X] Slint
