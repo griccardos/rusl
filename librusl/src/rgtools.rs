@@ -21,7 +21,7 @@ struct MyWrite {
     data: Vec<u8>,
 }
 
-pub const SEPARATOR: &[u8] = &[0, 1, 2, 3, 4];
+pub const SEPARATOR: &str = r"\0\1\2\3\4";
 
 pub fn search_contents(
     pattern: &str,
@@ -40,11 +40,13 @@ pub fn search_contents(
 
     let mut searcher = SearcherBuilder::new()
         .binary_detection(BinaryDetection::quit(b'\x00'))
-        .line_number(false)
+        .line_number(true)
         .build();
 
     let my_write = MyWrite { data: vec![] };
-    let mut printer = StandardBuilder::new().separator_field_match(SEPARATOR.to_vec()).build_no_color(my_write);
+    let mut printer = StandardBuilder::new()
+        .separator_field_match(SEPARATOR.as_bytes().to_vec())
+        .build_no_color(my_write);
 
     if let Some(allowed_files) = allowed_files {
         for path in allowed_files {

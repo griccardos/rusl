@@ -11,9 +11,9 @@ use std::time::{Duration, Instant};
 use clipboard::{ClipboardContext, ClipboardProvider};
 use ignore::WalkBuilder;
 
-use crate::fileinfo::FileInfo;
+use crate::fileinfo::{FileInfo, Match};
 use crate::options::{FTypes, Options, Sort};
-use crate::rgtools;
+use crate::rgtools::{self, SEPARATOR};
 use crate::search::Search;
 
 type Mid = usize;
@@ -25,10 +25,12 @@ pub enum Message {
     Quit,
 }
 
+#[derive(Debug)]
 pub enum SearchResult {
     FinalResults(FinalResults),
     InterimResult(FileInfo),
 }
+#[derive(Debug)]
 pub struct FinalResults {
     pub data: Vec<FileInfo>,
     pub duration: Duration,
@@ -49,7 +51,7 @@ impl Manager {
         let (s, r) = std::sync::mpsc::channel();
 
         thread::spawn(move || {
-            Manager::message_receiver(r, external_sender, Sort::Path);
+            Manager::message_receiver(r, external_sender, ops.sort.clone());
         });
         Self {
             internal_sender: s,
@@ -201,7 +203,7 @@ impl Manager {
 
                 if is_match {
                     let mut must_add = true;
-                    let mut content = "".to_string();
+                    let mut matches = vec![];
                     if !search.contents_text.is_empty() {
                         let cont = Manager::find_contents(
                             &search.contents_text,
@@ -213,7 +215,7 @@ impl Manager {
                         if cont.is_empty() {
                             must_add = false;
                         } else {
-                            content = cont.get(0).unwrap().content.clone();
+                            matches = cont[0].matches.clone();
                         }
                     }
 
@@ -228,7 +230,7 @@ impl Manager {
                                     .to_str()
                                     .unwrap_or_default()
                                     .into(),
-                                content,
+                                matches,
                                 is_folder: dent.file_type().unwrap().is_dir(),
                             },
                             id,
@@ -247,52 +249,46 @@ impl Manager {
     fn find_contents(text: &str, dir: &str, allowed_files: Option<HashSet<String>>, options: Options, must_stop: Arc<AtomicBool>) -> Vec<FileInfo> {
         let strings = rgtools::search_contents(text, &[OsString::from_str(dir).unwrap()], allowed_files, options.content, must_stop);
 
-        const MAX: usize = 100;
-        let result: Vec<FileInfo> = strings
+        let file_line_content: Vec<Vec<&str>> = strings
             .iter()
-            .filter_map(|x| x.split_once(&String::from_utf8(rgtools::SEPARATOR.to_vec()).unwrap()))
-            .map(|x| {
-                let mut data = x.1;
-                //limit size
-                if data.len() > MAX {
-                    let mut count = MAX;
-                    let mut datab = data.as_bytes();
-                    loop {
-                        datab = &datab[..count];
-                        //in case in middle of grapheme
-                        let temp = String::from_utf8(datab.to_vec());
-                        if temp.is_ok() || count == 1 {
-                            break;
-                        }
-                        count -= 1;
-                    }
-                    data = &data[..count]
-                }
-                (x.0, data)
-            })
-            .map(|x| {
-                let pb = PathBuf::from(x.0);
-                FileInfo {
-                    path: x.0.into(),
-                    content: x.1.trim_start().into(),
-                    ext: pb.extension().unwrap_or(&OsString::from("")).to_str().unwrap_or_default().into(),
-                    name: PathBuf::from(x.0).file_name().unwrap_or_default().to_str().unwrap_or_default().into(),
-                    is_folder: pb.is_dir(),
-                }
-            })
+            .map(|x| x.split(&SEPARATOR).collect::<Vec<&str>>())
+            .filter(|x| x.len() == 3)
             .collect();
+        let mut hm: HashMap<&str, FileInfo> = HashMap::new();
+        for f in file_line_content.iter() {
+            if !hm.contains_key(f[0]) {
+                let pb = PathBuf::from(f[0]);
+                hm.insert(
+                    f[0],
+                    FileInfo {
+                        path: f[0].into(),
+                        matches: vec![],
+                        ext: pb.extension().unwrap_or(&OsString::from("")).to_str().unwrap_or_default().into(),
+                        name: PathBuf::from(f[0]).file_name().unwrap_or_default().to_str().unwrap_or_default().into(),
+                        is_folder: pb.is_dir(),
+                    },
+                );
+            }
 
-        result
+            hm.entry(f[0]).and_modify(|e| {
+                e.matches.push(Match {
+                    line: f[1].parse().unwrap_or(0),
+                    content: f[2].to_owned(),
+                })
+            });
+        }
+
+        hm.into_values().collect()
     }
 
     fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sender<SearchResult>, sort_type: Sort) {
-        let mut final_names = HashMap::new();
+        let mut final_names = vec![];
         let mut latest_number = 0;
         let mut tot_elapsed = Duration::from_secs(0);
         loop {
             let message = internal_receiver.recv();
             if message.is_err() {
-                eprintln!("unknown message: {:?}", message.err());
+                //eprintln!("unknown message: {:?}", message.err());
                 continue;
             }
             let message = message.unwrap();
@@ -309,7 +305,7 @@ impl Manager {
                     eprintln!("Received content {number}");
                     //only update if new update (old updates are discarded)
                     for f in files {
-                        final_names.insert(f.path.to_owned(), f);
+                        final_names.push(f);
                     }
                     tot_elapsed += elapsed;
                 }
@@ -320,7 +316,7 @@ impl Manager {
                     }
                     //eprintln!("Received file {number}");
                     //send to output
-                    final_names.insert(file.path.to_string(), file.clone());
+                    final_names.push(file.clone());
                     external_sender.send(SearchResult::InterimResult(file)).unwrap();
                 }
                 Message::Done(number, elapsed) => {
@@ -330,11 +326,10 @@ impl Manager {
                     eprintln!("Received Done {number}");
                     tot_elapsed += elapsed.to_owned();
 
-                    let mut res = final_names.iter().map(|(_, v)| v.to_owned()).collect::<Vec<FileInfo>>();
-                    Manager::do_sort(&mut res, sort_type);
+                    Manager::do_sort(&mut final_names, sort_type);
                     let results = SearchResult::FinalResults(FinalResults {
                         id: latest_number,
-                        data: res.to_vec(),
+                        data: final_names.to_vec(),
                         duration: tot_elapsed,
                     });
 
@@ -348,10 +343,9 @@ impl Manager {
     }
 
     fn do_sort(vec: &mut [FileInfo], sort: Sort) {
-        //always sort by path first...
-        vec.sort_by(|a, b| a.path.cmp(&b.path));
         match sort {
-            Sort::Path => (),
+            Sort::None => (),
+            Sort::Path => vec.sort_by(|a, b| a.path.cmp(&b.path)),
             Sort::Name => vec.sort_by(|a, b| a.name.cmp(&b.name)),
             Sort::Extension => vec.sort_by(|a, b| a.ext.cmp(&b.ext)),
         };
@@ -418,5 +412,29 @@ fn save_settings(ops: &mut Options) {
         } else {
             eprintln!("Could not convert {result:?}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::mpsc::channel;
+
+    use super::*;
+
+    #[test]
+    fn find_names() {
+        let (s, r) = channel();
+        let mut man = Manager::new(s);
+        man.search(Search {
+            dir: "/temp".to_string(),
+            name_text: "temp.csv".to_string(),
+            contents_text: "41".to_string(),
+        });
+
+        thread::sleep(Duration::from_secs(1));
+        if let Ok(mess) = r.recv() {
+            println!("{mess:?}");
+        }
+        assert!(false)
     }
 }

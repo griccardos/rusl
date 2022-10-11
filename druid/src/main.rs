@@ -5,8 +5,7 @@ use std::{sync::mpsc, thread::spawn, time::Instant};
 
 use druid::{
     im::Vector,
-    piet::TextStorage,
-    text::{Attribute, RichText},
+    text::{Attribute, RichText, RichTextBuilder},
     widget::{Button, Checkbox, Controller, Either, Flex, Label, List, RawLabel, Scroll, TextBox},
     AppDelegate, AppLauncher, Code, Color, Command, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, Lens, Selector, Target, Widget,
     WidgetExt, WindowDesc,
@@ -128,23 +127,9 @@ fn ui_builder() -> impl Widget<AppState> {
         })
         .fix_size(40., 40.);
 
-    let list = Scroll::new(
-        List::new(|| {
-            RawLabel::new().padding(1.0).on_click(|ctx, data: &mut RichText, _env| {
-                let mut filename = data.as_str().split_once(' ').unwrap().1;
-                if filename.contains('>') {
-                    //if we are showing content too...
-                    filename = filename.split_once('>').unwrap().0;
-                }
-
-                ctx.submit_command(Command::new(EXPORTSINGLE, filename.to_string(), Target::Auto))
-            })
-        })
-        .lens(AppState::visible)
-        .padding(10.),
-    )
-    .background(Color::rgba8(50, 50, 50, 255))
-    .expand();
+    let list = Scroll::new(List::new(|| RawLabel::new().padding(1.0)).lens(AppState::visible).padding(10.))
+        .background(Color::rgba8(0, 0, 0, 255))
+        .expand();
 
     Flex::column()
         .with_child(
@@ -280,21 +265,18 @@ impl AppDelegate<AppState> for Delegate {
 
         if let Some(results) = cmd.get(RESULTS) {
             const MAX_OUT: usize = 1000;
+            let re_name = RegexBuilder::new(&data.text_name).case_insensitive(!data.name_case_sensitive).build();
+            let re_content = RegexBuilder::new(&data.text_contents)
+                .case_insensitive(!data.content_case_sensitive)
+                .build();
+            let re_numbers = RegexBuilder::new(r"(^|\n)(\d+:)").build();
 
             if let SearchResult::InterimResult(fi) = results {
                 if data.visible.len() < MAX_OUT {
-                    let sym = if fi.is_folder { "📁" } else { "📝" };
-                    let string = format!("{} {}> {}", sym, fi.path.clone(), fi.content.trim());
-                    data.visible.push_back(RichText::new(string.into()));
-                    //TODO this takes long. fix
-                    //data.visible.push_back(highlight_result(fi, re_name.clone(), re_content.clone()));
+                    data.visible
+                        .push_back(highlight_result(fi, re_name.clone(), re_content.clone(), re_numbers.clone()));
                 }
             } else if let SearchResult::FinalResults(results) = results {
-                let re_name = RegexBuilder::new(&data.text_name).case_insensitive(!data.name_case_sensitive).build();
-                let re_content = RegexBuilder::new(&data.text_contents)
-                    .case_insensitive(!data.content_case_sensitive)
-                    .build();
-
                 data.data = results.data.iter().map(|x| x.path.to_string()).collect();
 
                 //create visible
@@ -305,7 +287,7 @@ impl AppDelegate<AppState> for Delegate {
                     .data
                     .iter()
                     .take(MAX_OUT)
-                    .map(|x| highlight_result(x, re_name.clone(), re_content.clone()))
+                    .map(|x| highlight_result(x, re_name.clone(), re_content.clone(), re_numbers.clone()))
                     .collect();
                 if results.data.len() > MAX_OUT {
                     data.visible
@@ -334,22 +316,28 @@ impl AppDelegate<AppState> for Delegate {
     }
 }
 
-fn highlight_result(x: &FileInfo, re_name: Result<Regex, regex::Error>, re_content: Result<Regex, regex::Error>) -> RichText {
+fn highlight_result(
+    x: &FileInfo,
+    re_name: Result<Regex, regex::Error>,
+    re_content: Result<Regex, regex::Error>,
+    re_numbers: Result<Regex, regex::Error>,
+) -> RichText {
     let sym = if x.is_folder { "📁" } else { "📝" };
     let symlen = sym.as_bytes().len();
     let mut full = sym.to_string();
     full.push(' ');
     full.push_str(&x.path);
-    let mut rich = if !x.content.is_empty() {
+    let mut rich = if !x.matches.is_empty() {
         full.push_str("> ");
         let start = full.len();
-        full.push_str(x.content.trim());
-        let mut rich = rich(&full, Color::WHITE);
-        rich.add_attribute(start..full.len(), Attribute::text_color(Color::rgb8(50, 255, 55)));
+        full.push('\n');
+        full.push_str(&x.content());
+        let mut rich = rich_with_path(&full, &x.path, Color::rgb8(58, 150, 221));
+        rich.add_attribute(start..full.len(), Attribute::text_color(Color::rgb8(164, 164, 164)));
         rich.add_attribute(0..symlen, Attribute::FontFamily(FontFamily::MONOSPACE));
         rich
     } else {
-        rich(&full, Color::WHITE)
+        rich_with_path(&full, &x.path, Color::rgb8(58, 150, 221))
     };
     //highlight matches in name:
     if let Ok(re) = &re_name {
@@ -362,7 +350,7 @@ fn highlight_result(x: &FileInfo, re_name: Result<Regex, regex::Error>, re_conte
 
                 if range.end <= x.path.len() + symlen + 1 {
                     rich.add_attribute(range.clone(), Attribute::Weight(FontWeight::BOLD));
-                    rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(80, 122, 80)));
+                    rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(189, 60, 71)));
                 } else {
                     eprintln!("{range:?} is out of range of {}", x.path.len());
                 }
@@ -370,26 +358,53 @@ fn highlight_result(x: &FileInfo, re_name: Result<Regex, regex::Error>, re_conte
         }
     }
     //highlight matches in content:
-    if !x.content.is_empty() {
+    if !x.matches.is_empty() {
+        let content = x.content();
+
         if let Ok(re) = &re_content {
-            for cap in re.captures_iter(&x.content) {
+            for cap in re.captures_iter(&content) {
                 if let Some(mat) = cap.get(0) {
                     let mut range = mat.range();
-                    if range.end <= x.content.len() {
-                        range.end += x.path.len() + 2 + symlen + 1;
-                        range.start += x.path.len() + 2 + symlen + 1;
+                    if range.end <= content.len() {
+                        range.start += x.path.len() + 2 + symlen + 2;
+                        range.end += x.path.len() + 2 + symlen + 2;
                         rich.add_attribute(range.clone(), Attribute::Weight(FontWeight::BOLD));
-                        rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(80, 80, 162)));
+                        rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(189, 60, 71)));
                     } else {
-                        eprintln!("{range:?} is out of range of {}", x.content.len());
+                        eprintln!("{range:?} is out of range of {}", x.content().len());
+                    }
+                }
+            }
+        }
+
+        //highlight line number
+        if let Ok(re) = &re_numbers {
+            for cap in re.captures_iter(&content) {
+                if let Some(mat) = cap.get(0) {
+                    let mut range = mat.range();
+                    if range.end <= content.len() {
+                        range.start += x.path.len() + 2 + symlen + 2;
+                        range.end += x.path.len() + 2 + symlen + 2;
+                        rich.add_attribute(range.clone(), Attribute::Weight(FontWeight::BOLD));
+                        rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(17, 122, 13)));
+                    } else {
+                        eprintln!("{range:?} is out of range of {}", x.content().len());
                     }
                 }
             }
         }
     }
+
     rich
 }
 
 fn rich(str: &str, col: Color) -> RichText {
     RichText::new(str.into()).with_attribute(.., Attribute::text_color(col))
+}
+
+fn rich_with_path(str: &str, path: &str, col: Color) -> RichText {
+    let mut builder = RichTextBuilder::new();
+    let command = Command::new(EXPORTSINGLE, path.to_string(), Target::Auto);
+    builder.push(str).add_attr(Attribute::text_color(col)).link(command);
+    builder.build()
 }

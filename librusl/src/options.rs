@@ -1,14 +1,28 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Options {
     //general options
+    #[serde(default)]
     pub sort: Sort,
     pub last_dir: String,
     pub name_history: Vec<String>,
     pub content_history: Vec<String>,
     pub name: NameOptions,
     pub content: ContentOptions,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            sort: Sort::None,
+            last_dir: ".".to_string(),
+            name_history: vec![],
+            content_history: vec![],
+            name: Default::default(),
+            content: Default::default(),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -37,16 +51,13 @@ pub struct ContentOptions {
     pub case_sensitive: bool,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, Default)]
 pub enum Sort {
+    #[default]
+    None,
     Path,
     Name,
     Extension,
-}
-impl Default for Sort {
-    fn default() -> Self {
-        Sort::Path
-    }
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Debug)]
