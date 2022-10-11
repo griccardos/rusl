@@ -9,8 +9,7 @@ Each GUI Can be found in its own folder. To compile, cd into the folder, and car
 Druid is currently the most feature complete and releases are Druid.
 
 Why the name rusl? Well, it's the sound made when you are searching through leaves or papers for something. Also it's 75% of the letters in rust!
-![rusl druid](https://user-images.githubusercontent.com/30464685/194580801-74021368-93e4-44e1-b0de-9237bc8a6839.png)
-
+![image](https://user-images.githubusercontent.com/30464685/195121654-619385d1-e102-49f8-95bc-2e4aac3b848e.png)
 
 ## Objectives
 - [X] File name search
