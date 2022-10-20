@@ -23,7 +23,7 @@ pub fn main() {
 }
 fn load_icon() -> eframe::IconData {
     let (icon_rgba, icon_width, icon_height) = {
-        let image = image::load_from_memory(include_bytes!("icons\\icon.png")).unwrap().into_rgba8();
+        let image = image::load_from_memory(include_bytes!("icons/icon.png")).unwrap().into_rgba8();
         let (width, height) = image.dimensions();
         let rgba = image.into_raw();
         (rgba, width, height)
@@ -111,11 +111,17 @@ impl AppState {
             ui.label("Search");
 
             ui.label("File Name");
-            ui.text_edit_singleline(&mut self.search_name);
+            let sn = ui.text_edit_singleline(&mut self.search_name);
+            if sn.lost_focus() && sn.ctx.input().key_pressed(egui::Key::Enter) {
+                self.do_search()
+            }
 
             ui.label("");
             ui.label("File contents");
-            ui.text_edit_singleline(&mut self.search_content);
+            let se = ui.text_edit_singleline(&mut self.search_content);
+            if se.lost_focus() && se.ctx.input().key_pressed(egui::Key::Enter) {
+                self.do_search()
+            }
 
             ui.label("");
             ui.label("Directory");
@@ -132,18 +138,7 @@ impl AppState {
             ui.add_space(10.);
 
             if ui.button("Find").clicked() {
-                if self.search_name.is_empty() && self.search_content.is_empty() {
-                    self.message = "Nothing to search for".to_string();
-                } else if !PathBuf::from(&self.manager.get_options().last_dir).exists() {
-                    self.message = "Invalid directory".to_string();
-                } else {
-                    self.manager.search(Search {
-                        name_text: self.search_name.clone(),
-                        contents_text: self.search_content.clone(),
-                        dir: self.manager.get_options().last_dir.clone(),
-                    });
-                    self.message = "Searching...".to_string();
-                }
+                self.do_search();
             }
             ui.add_space(10.);
             ui.label(&format!("{}", self.message));
@@ -162,6 +157,21 @@ impl AppState {
             ui.separator();
             ui.hyperlink("https://github.com/griccardos/rusl");
         });
+    }
+
+    fn do_search(&mut self) {
+        if self.search_name.is_empty() && self.search_content.is_empty() {
+            self.message = "Nothing to search for".to_string();
+        } else if !PathBuf::from(&self.manager.get_options().last_dir).exists() {
+            self.message = "Invalid directory".to_string();
+        } else {
+            self.manager.search(Search {
+                name_text: self.search_name.clone(),
+                contents_text: self.search_content.clone(),
+                dir: self.manager.get_options().last_dir.clone(),
+            });
+            self.message = "Searching...".to_string();
+        }
     }
     fn central_panel(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
