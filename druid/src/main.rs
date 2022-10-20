@@ -48,7 +48,7 @@ struct AppState {
 pub fn main() {
     let (s, r) = mpsc::channel::<SearchResult>();
     let man = Manager::new(s);
-    let ops = &man.options;
+    let ops = man.get_options();
 
     let data = AppState {
         text_name: "".to_string(),
@@ -228,7 +228,7 @@ impl AppDelegate<AppState> for Delegate {
 
             data.message = rich("Searching...", Color::YELLOW);
             //set options
-            let mut ops = self.manager.options.clone();
+            let mut ops = self.manager.get_options();
             ops.name.case_sensitive = data.name_case_sensitive;
             ops.name.follow_links = data.name_follow_links;
             ops.name.same_filesystem = data.name_same_filesystem;

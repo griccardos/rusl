@@ -122,23 +122,25 @@ impl AppState {
             ui.horizontal(|ui| {
                 if ui.button("📁").clicked() {
                     if let Some(folder) = rfd::FileDialog::new().pick_folder() {
-                        self.manager.options.last_dir = folder.to_string_lossy().to_string();
+                        let mut ops = self.manager.get_options();
+                        ops.last_dir = folder.to_string_lossy().to_string();
+                        self.manager.set_options(ops);
                     }
                 }
-                ui.text_edit_singleline(&mut self.manager.options.last_dir);
+                ui.text_edit_singleline(&mut self.manager.get_options().last_dir);
             });
             ui.add_space(10.);
 
             if ui.button("Find").clicked() {
                 if self.search_name.is_empty() && self.search_content.is_empty() {
                     self.message = "Nothing to search for".to_string();
-                } else if !PathBuf::from(&self.manager.options.last_dir).exists() {
+                } else if !PathBuf::from(&self.manager.get_options().last_dir).exists() {
                     self.message = "Invalid directory".to_string();
                 } else {
                     self.manager.search(Search {
                         name_text: self.search_name.clone(),
                         contents_text: self.search_content.clone(),
-                        dir: self.manager.options.last_dir.clone(),
+                        dir: self.manager.get_options().last_dir.clone(),
                     });
                     self.message = "Searching...".to_string();
                 }
@@ -174,12 +176,12 @@ impl AppState {
     fn settings_panel(&mut self, ui: &mut egui::Ui) {
         ui.heading("Settings");
         ui.label("Name settings");
-        ui.checkbox(&mut self.manager.options.name.case_sensitive, "Case sensitive");
-        ui.checkbox(&mut self.manager.options.name.same_filesystem, "Same filesystem");
-        ui.checkbox(&mut self.manager.options.name.ignore_dot, "Ignore dot files");
-        ui.checkbox(&mut self.manager.options.name.follow_links, "Follow links");
+        ui.checkbox(&mut self.manager.get_options().name.case_sensitive, "Case sensitive");
+        ui.checkbox(&mut self.manager.get_options().name.same_filesystem, "Same filesystem");
+        ui.checkbox(&mut self.manager.get_options().name.ignore_dot, "Ignore dot files");
+        ui.checkbox(&mut self.manager.get_options().name.follow_links, "Follow links");
         ui.label("Contents");
-        ui.checkbox(&mut self.manager.options.content.case_sensitive, "Case sensitive");
+        ui.checkbox(&mut self.manager.get_options().content.case_sensitive, "Case sensitive");
     }
 
     fn results_panel(&mut self, ui: &mut egui::Ui) {

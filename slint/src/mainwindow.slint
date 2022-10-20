@@ -8,6 +8,9 @@
 // 7. no hyperlinks in text
 // 8. unable to format slint file
 // 9. padding in listview not working
+// 10. linux issues: 
+//      - buttons images not working 
+//      - tab background not working
 
 import{LineEdit,CheckBox,ListView,ComboBox,TabWidget,StandardButton ,TextEdit } from "std-widgets.slint";
 
@@ -25,7 +28,7 @@ export MainWindow := Window {
     property <int> tab_height:80;
     property <bool> show_options;
     property <bool> export_enabled:false;
-    property <string>selected_sort:"Path";
+    property <string>selected_sort:"None";
     property <bool> error_dir:false;
 
     callback sort_changed();
@@ -69,7 +72,6 @@ export MainWindow := Window {
                             height:50px;
                             edit:= LineEdit { 
                                 placeholder-text:"File name";
-                                border-radius: 8px;
                                 height:40px;
                                 text <=> root.find-text;
                                 accepted => { root.search(); }
@@ -134,7 +136,6 @@ export MainWindow := Window {
                         height:50px;
                         LineEdit { 
                             placeholder-text:"Text to find in contents";
-                            border-radius: 8px;
                             height:40px;
                             text <=> root.content_find_text;
                             accepted => { root.search(); }
@@ -180,9 +181,8 @@ export MainWindow := Window {
             Rectangle { 
             LineEdit { 
                 placeholder-text:"Starting directory (optional)";
-                border-radius: 8px;
                 height:40px;
-                //background: root.error-dir?#cf7d7d:white;
+                background: root.error-dir?#cf7d7d:white;
                 text <=> root.directory;
                 edited => { root.dir-changed();} 
                 accepted => { root.search(); }
@@ -234,7 +234,7 @@ export MainWindow := Window {
             ComboBox {  
                 height: 30px;
                 width: 200px;
-                model: ["Path", "File name", "Extension"];
+                model: ["None","Path", "File name", "Extension"];
                 current-value<=> root.selected_sort; 
                 selected => { root.sort_changed(); }
             }
@@ -256,25 +256,34 @@ export MainWindow := Window {
         }
         }}
         }
+        Rectangle { 
+            background:black;
+            padding: 20px; 
+         
         result_list:=ListView { 
-            background: black;
-            border-radius: 8px;
-            padding: 20px; //not working
 
             for f in files: 
             HorizontalLayout{
                 alignment: start;
                 width: parent.width -20px;
-                
+
+                VerticalLayout { 
                     Text{
-                        text:f.name +"> "+f.data;
-                        color: white; 
+                        text:f.name;
+                        color: rgb(58, 150, 221); 
                         overflow: elide;
                     }
-                
+                    if f.data!="":
+                    Text{
+                        text:f.data;
+                        color: rgb(164,164,164); 
+                        overflow: elide;
+                    }
+                }
                 }
                 
         }
+    }
     }
     }
     }

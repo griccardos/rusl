@@ -1,5 +1,5 @@
 //hide windows console
-#![windows_subsystem = "windows"]
+//#![windows_subsystem = "windows"]
 
 use librusl::manager::{Manager, SearchResult};
 use librusl::options::{FTypes, Sort};
@@ -33,6 +33,7 @@ pub fn main() {
 
     //spawn result receiver
     let weak_receiver = weak.clone();
+    let results_receiver = results.clone();
     thread::spawn(move || {
         let weak = weak_receiver.clone();
         let mut current: Vec<FileInfo> = vec![];
@@ -43,6 +44,8 @@ pub fn main() {
                     set_data(weak.clone(), res.data.iter().map(|x| x.to_owned()).collect(), res.duration, true);
                     current.clear();
                     counter = 0;
+
+                    *results_receiver.lock().unwrap() = res.data;
                 }
                 SearchResult::InterimResult(res) => {
                     counter += 1;
@@ -96,21 +99,29 @@ pub fn main() {
 
     //on change sort method, we resort
     let weak_sort = weak.clone();
-    let _manager_sort = manager.clone();
+    let manager_sort = manager.clone();
+    let results_sort = results.clone();
     mw.on_sort_changed(move || {
+        println!("sort changed");
         let weak = weak_sort.unwrap();
         let sort_new = weak.get_selected_sort().as_str().to_owned();
-        let _sort_new = match sort_new.as_str() {
+        let sort_new = match sort_new.as_str() {
             "Path" => Sort::Path,
             "Extension" => Sort::Extension,
             "Name" => Sort::Name,
-            _ => Sort::Path,
+            "None" => Sort::None,
+            _ => Sort::None,
         };
         //TODO
-        //let manager_sort = manager_sort.lock().unwrap();
-        //manager_sort.set_sort(sort_new);
-        //manager_sort.sort();
-        //set_data(weak_sort.clone(), results.to_vec(), Duration::from_secs(0), false);
+        let mut manager_sort = manager_sort.lock().unwrap();
+        manager_sort.set_sort(sort_new);
+        let mut results_vec = results_sort.lock().unwrap().to_vec();
+        println!("about to sortt {}", results_vec.len());
+        Manager::do_sort(&mut results_vec, sort_new);
+        println!("sorted {}", results_vec.len());
+        *results_sort.lock().unwrap() = results_vec.clone();
+
+        set_data(weak_sort.clone(), results_vec, Duration::from_secs(0), false);
     });
 
     //exports
@@ -147,10 +158,11 @@ pub fn main() {
 fn get_and_update_options(manager: Arc<Mutex<Manager>>, weak: Weak<MainWindow>) {
     let mut man = manager.lock().unwrap();
     let weak = weak.unwrap();
+    let mut ops = man.get_options();
     //get name options
-    man.options.name.case_sensitive = weak.get_case_sensitive();
+    ops.name.case_sensitive = weak.get_case_sensitive();
     let ftypes: &str = &weak.get_selected_ftypes().to_string();
-    man.options.name.file_types = match ftypes {
+    ops.name.file_types = match ftypes {
         "All" => FTypes::All,
         "Files" => FTypes::Files,
         "Directories" => FTypes::Directories,
@@ -158,7 +170,8 @@ fn get_and_update_options(manager: Arc<Mutex<Manager>>, weak: Weak<MainWindow>) 
     };
 
     //get content options
-    man.options.content.case_sensitive = weak.get_content_case_sensitive();
+    ops.content.case_sensitive = weak.get_content_case_sensitive();
+    man.set_options(ops);
 }
 
 fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, finished: bool) {
@@ -196,9 +209,10 @@ fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, fin
 fn set_options(weak: Weak<MainWindow>, manager: Arc<Mutex<Manager>>) {
     let _ = weak.upgrade_in_event_loop(move |weak| {
         let man = manager.lock().unwrap();
-        weak.set_case_sensitive(man.options.name.case_sensitive);
-        weak.set_content_case_sensitive(man.options.content.case_sensitive);
-        weak.set_directory(man.options.last_dir.clone().into());
+        let ops = man.get_options();
+        weak.set_case_sensitive(ops.name.case_sensitive);
+        weak.set_content_case_sensitive(ops.content.case_sensitive);
+        weak.set_directory(ops.last_dir.clone().into());
     });
 }
 

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -16,12 +16,11 @@ use crate::options::{FTypes, Options, Sort};
 use crate::rgtools::{self, SEPARATOR};
 use crate::search::Search;
 
-type Mid = usize;
 pub enum Message {
-    File(FileInfo, Mid),
-    Done(Mid, Duration),
-    ContentFiles(Vec<FileInfo>, Mid, Duration),
-    StartSearch(Mid),
+    File(FileInfo, usize),
+    Done(usize, Duration),
+    ContentFiles(Vec<FileInfo>, usize, Duration),
+    StartSearch(usize),
     Quit,
 }
 
@@ -34,24 +33,25 @@ pub enum SearchResult {
 pub struct FinalResults {
     pub data: Vec<FileInfo>,
     pub duration: Duration,
-    pub id: Mid,
+    pub id: usize,
 }
 pub struct Manager {
     internal_sender: Sender<Message>,
-    id: Mid,
-    pub options: Options,
+    id: usize,
+    options: Arc<Mutex<Options>>,
     pub must_stop: Arc<AtomicBool>,
 }
 
 impl Manager {
     pub fn new(external_sender: Sender<SearchResult>) -> Self {
-        let ops = load_settings();
+        let ops = load_options();
+        let ops = Arc::new(Mutex::new(ops));
 
         //internal channel that sends results inside
         let (s, r) = std::sync::mpsc::channel();
-
+        let ops_for_receiver = ops.clone();
         thread::spawn(move || {
-            Manager::message_receiver(r, external_sender, ops.sort.clone());
+            message_receiver(r, external_sender, ops_for_receiver);
         });
         Self {
             internal_sender: s,
@@ -65,25 +65,27 @@ impl Manager {
     }
 
     pub fn search(&mut self, search: Search) {
+        let mut ops = self.options.lock().unwrap();
         self.id += 1;
         self.must_stop.store(false, std::sync::atomic::Ordering::Relaxed);
-        self.options.last_dir = search.dir.clone();
-        if !search.name_text.is_empty() && !self.options.name_history.contains(&search.name_text) {
-            self.options.name_history.push(search.name_text.clone());
+        ops.last_dir = search.dir.clone();
+        if !search.name_text.is_empty() && !ops.name_history.contains(&search.name_text) {
+            ops.name_history.push(search.name_text.clone());
         }
-        if !search.contents_text.is_empty() && !self.options.content_history.contains(&search.contents_text) {
-            self.options.content_history.push(search.contents_text.clone());
+        if !search.contents_text.is_empty() && !ops.content_history.contains(&search.contents_text) {
+            ops.content_history.push(search.contents_text.clone());
         }
-        self.spawn_search(search, self.internal_sender.clone(), self.options.clone(), self.id);
+        drop(ops);
+        self.spawn_search(search);
     }
 
     pub fn save_and_quit(&mut self) {
-        save_settings(&mut self.options);
+        save_settings(&mut self.options.lock().unwrap());
         self.internal_sender.send(Message::Quit).expect("Quit");
     }
 
     pub fn save(&mut self) {
-        save_settings(&mut self.options);
+        save_settings(&mut self.options.lock().unwrap());
     }
 
     pub fn dir_is_valid(&self, dir: &str) -> bool {
@@ -91,7 +93,15 @@ impl Manager {
     }
 
     pub fn set_options(&mut self, ops: Options) {
-        self.options = ops;
+        *self.options.lock().unwrap() = ops;
+    }
+
+    pub fn get_options(&self) -> Options {
+        self.options.lock().unwrap().clone()
+    }
+
+    pub fn set_sort(&mut self, sort: Sort) {
+        self.options.lock().unwrap().sort = sort;
     }
 
     pub fn export(&self, paths: Vec<String>) {
@@ -103,11 +113,13 @@ impl Manager {
         }
     }
 
-    fn spawn_search(&self, search: Search, file_sender: Sender<Message>, options: Options, message_number: Mid) {
+    fn spawn_search(&self, search: Search) {
+        let message_number = self.id;
         eprintln!("Manager: Start Search {message_number} {:?}", Instant::now());
 
+        let file_sender = self.internal_sender.clone();
         //reset search, and send type
-        let res = file_sender.send(Message::StartSearch(message_number));
+        let res = file_sender.send(Message::StartSearch(self.id));
         if let Result::Err(err) = res {
             eprintln!("Error sending {err}");
         }
@@ -115,8 +127,8 @@ impl Manager {
         //do name search
         let must_stop1 = self.must_stop.clone();
         let search1 = search.clone();
-        let options1 = options.clone();
         let file_sender1 = file_sender.clone();
+        let options1 = self.options.lock().unwrap().clone();
 
         if !search.name_text.is_empty() {
             thread::spawn(move || {
@@ -132,10 +144,11 @@ impl Manager {
 
         //do content search (only if name is empty, otherwise it will be spawned after)
         let must_stop2 = self.must_stop.clone();
+        let options2 = self.options.lock().unwrap().clone();
         if !search.contents_text.is_empty() && search.name_text.is_empty() {
             thread::spawn(move || {
                 let start = Instant::now();
-                let files = Manager::find_contents(&search.contents_text, &search.dir, None, options, must_stop2);
+                let files = Manager::find_contents(&search.contents_text, &search.dir, None, options2, must_stop2);
                 file_sender.send(Message::ContentFiles(files, message_number, start.elapsed())).unwrap();
                 file_sender.send(Message::Done(message_number, start.elapsed())).unwrap();
                 eprintln!("Manager: Done content only search {message_number}  {:?}", Instant::now());
@@ -284,74 +297,75 @@ impl Manager {
         hm.into_values().collect()
     }
 
-    fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sender<SearchResult>, sort_type: Sort) {
-        let mut final_names = vec![];
-        let mut latest_number = 0;
-        let mut tot_elapsed = Duration::from_secs(0);
-        loop {
-            let message = internal_receiver.recv();
-            if message.is_err() {
-                //eprintln!("unknown message: {:?}", message.err());
-                continue;
-            }
-            let message = message.unwrap();
-            match message {
-                Message::StartSearch(id) => {
-                    latest_number = id;
-                    tot_elapsed = Duration::from_secs(0);
-                    final_names.clear();
-                }
-                Message::ContentFiles(files, number, elapsed) => {
-                    if number != latest_number {
-                        return;
-                    }
-                    eprintln!("Received content {number}");
-                    //only update if new update (old updates are discarded)
-                    for f in files {
-                        final_names.push(f);
-                    }
-                    tot_elapsed += elapsed;
-                }
-                Message::File(file, number) => {
-                    //only update if new update (old updates are discarded)
-                    if number != latest_number {
-                        return;
-                    }
-                    //eprintln!("Received file {number}");
-                    //send to output
-                    final_names.push(file.clone());
-                    external_sender.send(SearchResult::InterimResult(file)).unwrap();
-                }
-                Message::Done(number, elapsed) => {
-                    if number != latest_number {
-                        return;
-                    }
-                    eprintln!("Received Done {number}");
-                    tot_elapsed += elapsed.to_owned();
-
-                    Manager::do_sort(&mut final_names, sort_type);
-                    let results = SearchResult::FinalResults(FinalResults {
-                        id: latest_number,
-                        data: final_names.to_vec(),
-                        duration: tot_elapsed,
-                    });
-
-                    //send out to whoever is listening
-                    external_sender.send(results).expect("Sent results");
-                }
-
-                Message::Quit => break,
-            }
-        }
-    }
-
-    fn do_sort(vec: &mut [FileInfo], sort: Sort) {
+    pub fn do_sort(vec: &mut [FileInfo], sort: Sort) {
         match sort {
             Sort::None => (),
             Sort::Path => vec.sort_by(|a, b| a.path.cmp(&b.path)),
             Sort::Name => vec.sort_by(|a, b| a.name.cmp(&b.name)),
             Sort::Extension => vec.sort_by(|a, b| a.ext.cmp(&b.ext)),
         };
+    }
+}
+
+fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sender<SearchResult>, ops: Arc<Mutex<Options>>) {
+    let mut final_names = vec![];
+    let mut latest_number = 0;
+    let mut tot_elapsed = Duration::from_secs(0);
+    loop {
+        let message = internal_receiver.recv();
+        if message.is_err() {
+            //eprintln!("unknown message: {:?}", message.err());
+            continue;
+        }
+        let message = message.unwrap();
+        match message {
+            Message::StartSearch(id) => {
+                latest_number = id;
+                tot_elapsed = Duration::from_secs(0);
+                final_names.clear();
+            }
+            Message::ContentFiles(files, number, elapsed) => {
+                if number != latest_number {
+                    return;
+                }
+                eprintln!("Received content {number}");
+                //only update if new update (old updates are discarded)
+                for f in files {
+                    final_names.push(f);
+                }
+                tot_elapsed += elapsed;
+            }
+            Message::File(file, number) => {
+                //only update if new update (old updates are discarded)
+                if number != latest_number {
+                    return;
+                }
+                //eprintln!("Received file {number}");
+                //send to output
+                final_names.push(file.clone());
+                external_sender.send(SearchResult::InterimResult(file)).unwrap();
+            }
+            Message::Done(number, elapsed) => {
+                if number != latest_number {
+                    return;
+                }
+                eprintln!("Received Done {number}");
+                tot_elapsed += elapsed.to_owned();
+
+                let sort_type = ops.lock().unwrap().sort.clone();
+                Manager::do_sort(&mut final_names, sort_type);
+                let results = SearchResult::FinalResults(FinalResults {
+                    id: latest_number,
+                    data: final_names.to_vec(),
+                    duration: tot_elapsed,
+                });
+
+                //send out to whoever is listening
+                external_sender.send(results).expect("Sent results");
+            }
+
+            Message::Quit => break,
+        }
     }
 }
 
@@ -384,7 +398,7 @@ fn get_or_create_settings_path() -> Option<String> {
     None
 }
 
-fn load_settings() -> Options {
+fn load_options() -> Options {
     let mut ops = Options::default();
 
     if let Some(file) = get_or_create_settings_path() {
