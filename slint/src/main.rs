@@ -1,5 +1,5 @@
 //hide windows console
-//#![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 
 use librusl::manager::{Manager, SearchResult};
 use librusl::options::{FTypes, Sort};

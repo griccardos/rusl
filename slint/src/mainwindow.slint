@@ -178,11 +178,12 @@ export MainWindow := Window {
         HorizontalLayout { 
             padding: 10px;
             height:50px;
-            Rectangle { 
-            LineEdit { 
+            Rectangle {
+                background: root.error-dir?red:transparent;
+                height: root.error-dir?42px:40px;
+                LineEdit { 
                 placeholder-text:"Starting directory (optional)";
                 height:40px;
-                background: root.error-dir?#cf7d7d:white;
                 text <=> root.directory;
                 edited => { root.dir-changed();} 
                 accepted => { root.search(); }
