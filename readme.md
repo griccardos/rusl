@@ -71,7 +71,7 @@ Functionality Implemented
 | - Settings            |&check;|&check;|&check;|&cross;| 
 | - Copy to clipboard   |&check;|&check;|&check;|&cross;| 
 | - Windows             |&check;|&check;|&check;|&check;| 
-| - Linux               |&check;|issues |       |       | 
+| - Linux               |&check;|issues |&check;|&check;| 
 | - Mac                 |&check;|       |       |       | 
 
 
