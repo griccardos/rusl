@@ -12,7 +12,8 @@
                 "args": [
                     "build",
                     "--bin=rusl",
-                    "--package=rusl"
+                    "--package=rusl",
+                    "--manifest-path=./slint/Cargo.toml"
                 ],
                 "filter": {
                     "name": "rusl",
@@ -20,7 +21,7 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${fileDirname}"
         },
         {
             "type": "lldb",

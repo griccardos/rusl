@@ -6,7 +6,8 @@
 // 5. no tab events
 // 6. No Selectable text without scroll bar or editing
 // 7. no hyperlinks in text
-// 8. how to format slint file
+// 8. unable to format slint file
+// 9. padding in listview not working
 
 import{LineEdit,CheckBox,ListView,ComboBox,TabWidget,StandardButton ,TextEdit } from "std-widgets.slint";
 
@@ -62,15 +63,13 @@ export MainWindow := Window {
             Tab{
                 title: root.find-text==""?"Name":"Name*";
                 Rectangle { 
-                    background: #2a2a2a;
-                    height: 400px;
                         HorizontalLayout {
                             y:10px; 
                             padding: 10px;
                             height:50px;
                             edit:= LineEdit { 
                                 placeholder-text:"File name";
-                        //        border-radius: 8px;
+                                border-radius: 8px;
                                 height:40px;
                                 text <=> root.find-text;
                                 accepted => { root.search(); }
@@ -128,15 +127,14 @@ export MainWindow := Window {
             Tab{
                 title:root.content_find_text==""?"Contents":"Contents*";
                 Rectangle { 
-                    background: #2a2a2a;
-                    height: 400px;
+                    
                     HorizontalLayout { 
                         padding: 10px;
                         y:10px;
                         height:50px;
                         LineEdit { 
                             placeholder-text:"Text to find in contents";
-                          //  border-radius: 8px;
+                            border-radius: 8px;
                             height:40px;
                             text <=> root.content_find_text;
                             accepted => { root.search(); }
@@ -182,7 +180,7 @@ export MainWindow := Window {
             Rectangle { 
             LineEdit { 
                 placeholder-text:"Starting directory (optional)";
-                //border-radius: 8px;
+                border-radius: 8px;
                 height:40px;
                 //background: root.error-dir?#cf7d7d:white;
                 text <=> root.directory;
@@ -259,8 +257,9 @@ export MainWindow := Window {
         }}
         }
         result_list:=ListView { 
-            //background: #4a4a4a;
-            //border-radius: 8px;
+            background: black;
+            border-radius: 8px;
+            padding: 20px; //not working
 
             for f in files: 
             HorizontalLayout{

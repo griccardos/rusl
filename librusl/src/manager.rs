@@ -122,8 +122,11 @@ impl Manager {
             thread::spawn(move || {
                 let start = Instant::now();
                 Manager::find_names(&search1, options1, message_number, file_sender1.clone(), must_stop1);
-                file_sender1.send(Message::Done(message_number, start.elapsed())).unwrap();
-                eprintln!("Manager: Done name Search {message_number} {:?}", Instant::now());
+                if let Err(err) = file_sender1.send(Message::Done(message_number, start.elapsed())) {
+                    eprintln!("Manager: Could not send result {message_number} {err:?}");
+                } else {
+                    eprintln!("Manager: Done name Search {message_number} {:?}", Instant::now());
+                }
             });
         }
 

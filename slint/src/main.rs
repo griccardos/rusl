@@ -2,7 +2,7 @@
 #![windows_subsystem = "windows"]
 
 use librusl::manager::{Manager, SearchResult};
-use librusl::options::{FTypes, Options, Sort};
+use librusl::options::{FTypes, Sort};
 use librusl::search::Search;
 use std::sync::mpsc;
 use std::{
@@ -28,17 +28,36 @@ pub fn main() {
     //gui window
     let mw = MainWindow::new();
     let weak = mw.as_weak();
-    let foptions = Arc::new(Mutex::new(Options::default()));
-    set_options(weak.clone(), foptions.clone());
+
+    set_options(weak.clone(), manager.clone());
 
     //spawn result receiver
     let weak_receiver = weak.clone();
     thread::spawn(move || {
         let weak = weak_receiver.clone();
+        let mut current: Vec<FileInfo> = vec![];
+        let mut counter = 0;
         loop {
-            if let SearchResult::FinalResults(res) = result_receiver.recv().unwrap() {
-                set_data(weak.clone(), res.data.iter().map(|x| x.to_owned()).collect(), res.duration, false)
-            }
+            match result_receiver.recv().unwrap() {
+                SearchResult::FinalResults(res) => {
+                    set_data(weak.clone(), res.data.iter().map(|x| x.to_owned()).collect(), res.duration, true);
+                    current.clear();
+                    counter = 0;
+                }
+                SearchResult::InterimResult(res) => {
+                    counter += 1;
+                    if current.len() < 1000 {
+                        current.push(res);
+                        set_data(
+                            weak.clone(),
+                            current.iter().map(|x| x.to_owned()).collect(),
+                            Duration::from_secs(0),
+                            false,
+                        );
+                    }
+                    let _ = weak.upgrade_in_event_loop(move |weak| weak.set_message(format!("Found {counter} ...").into()));
+                }
+            };
         }
     });
 
@@ -49,18 +68,29 @@ pub fn main() {
         let weak = weak_edited.clone().unwrap();
         let name_text = weak.get_find_text().as_str().to_string();
         let content_text = weak.get_content_find_text().as_str().to_string();
-
         let dir = weak.get_directory().as_str().to_owned();
-
-        //options
-        get_and_update_options(foptions.clone(), weak_edited.clone());
-
         let search = Search {
             name_text: name_text.to_string(),
             contents_text: content_text.to_string(),
             dir: dir.to_string(),
         };
+
+        get_and_update_options(manager_search.clone(), weak_edited.clone());
+
         let mut manager = manager_search.lock().unwrap();
+
+        if name_text.is_empty() && content_text.is_empty() {
+            weak.set_message("Nothing to search for".into());
+            return;
+        }
+
+        if !manager.dir_is_valid(&search.dir) {
+            weak.set_message("Invalid directory".into());
+            return;
+        }
+
+        weak.set_message("Searching...".into());
+
         manager.search(search);
     });
 
@@ -109,15 +139,18 @@ pub fn main() {
 
     //run window until quit
     mw.run();
+
+    //save options
+    manager.lock().unwrap().save_and_quit();
 }
 
-fn get_and_update_options(foptions: Arc<Mutex<Options>>, weak: Weak<MainWindow>) {
-    let mut ops = foptions.lock().unwrap();
+fn get_and_update_options(manager: Arc<Mutex<Manager>>, weak: Weak<MainWindow>) {
+    let mut man = manager.lock().unwrap();
     let weak = weak.unwrap();
     //get name options
-    ops.name.case_sensitive = weak.get_case_sensitive();
+    man.options.name.case_sensitive = weak.get_case_sensitive();
     let ftypes: &str = &weak.get_selected_ftypes().to_string();
-    ops.name.file_types = match ftypes {
+    man.options.name.file_types = match ftypes {
         "All" => FTypes::All,
         "Files" => FTypes::Files,
         "Directories" => FTypes::Directories,
@@ -125,26 +158,32 @@ fn get_and_update_options(foptions: Arc<Mutex<Options>>, weak: Weak<MainWindow>)
     };
 
     //get content options
-    ops.content.case_sensitive = weak.get_content_case_sensitive();
+    man.options.content.case_sensitive = weak.get_content_case_sensitive();
 }
 
-fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, reset: bool) {
+fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, finished: bool) {
     let _ = weak.upgrade_in_event_loop(move |weak| {
         let count = files.len() as i32;
-        let sfiles: Vec<SFileInfo> = files
+        let mut sfiles: Vec<SFileInfo> = files
             .iter()
+            .take(1000)
             .map(|x| SFileInfo {
                 name: x.path.clone().into(),
                 data: x.content().clone().into(),
             })
             .collect();
+        if count > 1000 {
+            sfiles.push(SFileInfo {
+                data: "".into(),
+                name: format!("...and {} others", count - 1000).into(),
+            });
+        }
         let model = VecModel::<SFileInfo>::from(sfiles);
         let modelrc = ModelRc::new(model);
         weak.set_files(modelrc);
-        if reset {
-            weak.set_message("...searching...".into());
-        } else {
-            weak.set_message(format!("Found {count} in {}s", elapsed.as_secs_f64()).into());
+
+        if finished {
+            weak.set_message(format!("Found {count} in {:.3}s", elapsed.as_secs_f64()).into());
         }
 
         match count > 0 {
@@ -154,11 +193,12 @@ fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, res
     });
 }
 
-fn set_options(weak: Weak<MainWindow>, foptions: Arc<Mutex<Options>>) {
+fn set_options(weak: Weak<MainWindow>, manager: Arc<Mutex<Manager>>) {
     let _ = weak.upgrade_in_event_loop(move |weak| {
-        let ops = foptions.lock().unwrap();
-        weak.set_case_sensitive(ops.name.case_sensitive);
-        weak.set_content_case_sensitive(ops.content.case_sensitive);
+        let man = manager.lock().unwrap();
+        weak.set_case_sensitive(man.options.name.case_sensitive);
+        weak.set_content_case_sensitive(man.options.content.case_sensitive);
+        weak.set_directory(man.options.last_dir.clone().into());
     });
 }
 
