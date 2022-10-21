@@ -10,7 +10,7 @@ use std::{
 use druid::{
     im::Vector,
     text::{Attribute, RichText, RichTextBuilder},
-    widget::{Button, Checkbox, Controller, Either, Flex, Label, List, RawLabel, Scroll, TextBox},
+    widget::{Button, Checkbox, Controller, Either, Flex, Label, List, RadioGroup, RawLabel, Scroll, TextBox},
     AppDelegate, AppLauncher, Code, Color, Command, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, Lens, Selector, Target, Widget,
     WidgetExt, WindowDesc,
 };
@@ -19,6 +19,7 @@ use regex::{Regex, RegexBuilder};
 use librusl::{
     fileinfo::FileInfo,
     manager::{Manager, SearchResult},
+    options::FTypes,
     search::Search,
 };
 
@@ -46,6 +47,7 @@ struct AppState {
     name_same_filesystem: bool,
     name_follow_links: bool,
     name_ignore_dot: bool,
+    name_search_file_type: SearchFileType,
     content_case_sensitive: bool,
     //regex
     #[data(ignore)]
@@ -84,6 +86,7 @@ pub fn main() {
         name_same_filesystem: ops.name.same_filesystem,
         name_follow_links: ops.name.follow_links,
         name_ignore_dot: ops.name.ignore_dot,
+        name_search_file_type: SearchFileType::All,
         content_case_sensitive: ops.content.case_sensitive,
         //regex
         re_name: Regex::new(""),
@@ -194,6 +197,15 @@ fn settings_panel() -> impl Widget<AppState> {
             .with_child(Checkbox::new("Same filesystem").lens(AppState::name_same_filesystem).align_left())
             .with_child(Checkbox::new("Ignore hidden (dot)").lens(AppState::name_ignore_dot).align_left())
             .with_child(Checkbox::new("Follow links").lens(AppState::name_follow_links).align_left())
+            .with_child(
+                RadioGroup::row(vec![
+                    ("All", SearchFileType::All),
+                    ("Files", SearchFileType::Files),
+                    ("Folders", SearchFileType::Folders),
+                ])
+                .lens(AppState::name_search_file_type)
+                .align_left(),
+            ) // Radio::new("All", true).lens(AppState::type_all)))
             .with_child(Label::new("Content Settings").align_left().padding(10.))
             .with_child(Checkbox::new("Case sensitive").lens(AppState::content_case_sensitive).align_left())
             .padding(10.),
@@ -264,6 +276,7 @@ impl AppDelegate<AppState> for Delegate {
             ops.name.same_filesystem = data.name_same_filesystem;
             ops.content.case_sensitive = data.content_case_sensitive;
             ops.name.ignore_dot = data.name_ignore_dot;
+            ops.name.file_types = data.name_search_file_type.clone().into();
 
             self.manager.set_options(ops);
 
@@ -340,9 +353,15 @@ impl AppDelegate<AppState> for Delegate {
 
                 let filecount = results.data.iter().filter(|x| !x.is_folder).count();
                 let foldercount = results.data.len() - filecount;
-                let mut string = format!("Found {filecount} files");
+                let mut string = String::new();
+                if filecount > 0 {
+                    string += &format!("Found {filecount} files");
+                }
                 if foldercount > 0 {
-                    string += &format!(" {foldercount} folders {} total", filecount + foldercount);
+                    string += &format!(" {foldercount} folders");
+                }
+                if filecount > 0 && foldercount > 0 {
+                    string += &format!(" {} total", filecount + foldercount);
                 }
                 string += &format!(" in {:.3}s", data.start.elapsed().as_secs_f64());
 
@@ -459,4 +478,21 @@ fn rich_with_path(str: &str, path: &str, col: Color) -> RichText {
     let command = Command::new(EXPORTSINGLE, path.to_string(), Target::Auto);
     builder.push(str).add_attr(Attribute::text_color(col)).link(command);
     builder.build()
+}
+
+#[derive(PartialEq, Clone, Data)]
+enum SearchFileType {
+    All,
+    Files,
+    Folders,
+}
+
+impl From<SearchFileType> for FTypes {
+    fn from(x: SearchFileType) -> Self {
+        match x {
+            SearchFileType::All => FTypes::All,
+            SearchFileType::Files => FTypes::Files,
+            SearchFileType::Folders => FTypes::Directories,
+        }
+    }
 }
