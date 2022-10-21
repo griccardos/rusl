@@ -92,11 +92,10 @@ Will keep an eye on this one.
 - Gui preview of slint files - Amazing!
 
 #### Cons
-- Limited widgets, unsure how to create new ones
-- No auto formatting of slint files
-- Basic functionality missing e.g.:
+- Limited widget configurability, (can create custom ones: https://docs.rs/slint/latest/slint/docs/recipes/index.html#custom-widgets)
     - Changing font colours for text in some widgets
     - Changing background colours
+- No auto formatting of slint files (this is being worked on)
 - Alignment not always working
 - Linux behind in development
 

@@ -354,15 +354,29 @@ impl AppDelegate<AppState> for Delegate {
                 let filecount = results.data.iter().filter(|x| !x.is_folder).count();
                 let foldercount = results.data.len() - filecount;
                 let mut string = String::new();
+
+                if filecount == 0 && foldercount == 0 {
+                    string.push_str("Nothing found")
+                } else {
+                    string.push_str("Found")
+                }
+
                 if filecount > 0 {
-                    string += &format!("Found {filecount} files");
+                    string += &format!(" {filecount} file");
+                    if filecount > 1 {
+                        string.push_str("s");
+                    }
                 }
                 if foldercount > 0 {
-                    string += &format!(" {foldercount} folders");
+                    string += &format!(" {foldercount} folder");
+                    if foldercount > 1 {
+                        string.push_str("s");
+                    }
                 }
                 if filecount > 0 && foldercount > 0 {
                     string += &format!(" {} total", filecount + foldercount);
                 }
+
                 string += &format!(" in {:.3}s", data.start.elapsed().as_secs_f64());
 
                 data.message = RichText::new(string.into());
