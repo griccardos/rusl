@@ -17,8 +17,11 @@ use librusl::{
 };
 
 pub fn main() {
-    let mut native_options = eframe::NativeOptions::default();
-    native_options.icon_data = Some(load_icon());
+    let native_options = eframe::NativeOptions {
+        icon_data: Some(load_icon()),
+        ..Default::default()
+    };
+
     eframe::run_native("rusl", native_options, Box::new(|cc| Box::new(AppState::new(cc))));
 }
 fn load_icon() -> eframe::IconData {
@@ -100,7 +103,7 @@ impl AppState {
                 ui.menu_button("File", |ui| {
                     if ui.button("Quit").clicked() {
                         self.manager.save_and_quit();
-                        frame.quit();
+                        frame.close();
                     }
                 });
             });
@@ -141,14 +144,14 @@ impl AppState {
                 self.do_search();
             }
             ui.add_space(10.);
-            ui.label(&format!("{}", self.message));
+            ui.label(&self.message);
             ui.add_space(40.0);
             if ui.button("Clipboard").on_hover_text("Save to clipboard").clicked() {
                 self.manager
                     .export(self.results.lock().unwrap().data.iter().map(|x| x.path.to_string()).collect());
             }
             if ui
-                .button(format!("{}", if self.show_settings { "Show results" } else { "Show settings" }))
+                .button((if self.show_settings { "Show results" } else { "Show settings" }).to_string())
                 .clicked()
             {
                 self.show_settings = !self.show_settings;
@@ -168,7 +171,7 @@ impl AppState {
             self.manager.search(Search {
                 name_text: self.search_name.clone(),
                 contents_text: self.search_content.clone(),
-                dir: self.manager.get_options().last_dir.clone(),
+                dir: self.manager.get_options().last_dir,
             });
             self.message = "Searching...".to_string();
         }
@@ -201,8 +204,14 @@ impl AppState {
                 if let Ok(results) = self.results.try_lock() {
                     for r in results.data.iter().take(2000) {
                         ui.label(&r.path);
-                        if !r.content().is_empty() {
-                            ui.label(&r.content());
+                        const MAX_COUNT: usize = 100;
+                        const MAX_LEN: usize = 200;
+                        let mut content = r.content(MAX_COUNT, MAX_LEN);
+                        if r.matches.len() > MAX_COUNT {
+                            content.push_str(&format!("\nand {} other lines", r.matches.len() - MAX_COUNT));
+                        }
+                        if !content.is_empty() {
+                            ui.label(&content);
                         }
                         ui.end_row();
                     }

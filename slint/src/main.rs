@@ -75,7 +75,7 @@ pub fn main() {
         let search = Search {
             name_text: name_text.to_string(),
             contents_text: content_text.to_string(),
-            dir: dir.to_string(),
+            dir,
         };
 
         get_and_update_options(manager_search.clone(), weak_edited.clone());
@@ -137,7 +137,7 @@ pub fn main() {
     });
 
     //dirchange
-    let weak_dir_changed = weak.clone();
+    let weak_dir_changed = weak;
     mw.on_dir_changed(move || {
         let weak = weak_dir_changed.clone().unwrap();
         let dir = weak.get_directory().as_str().to_owned();
@@ -161,7 +161,7 @@ fn get_and_update_options(manager: Arc<Mutex<Manager>>, weak: Weak<MainWindow>) 
     let mut ops = man.get_options();
     //get name options
     ops.name.case_sensitive = weak.get_case_sensitive();
-    let ftypes: &str = &weak.get_selected_ftypes().to_string();
+    let ftypes: &str = &weak.get_selected_ftypes();
     ops.name.file_types = match ftypes {
         "All" => FTypes::All,
         "Files" => FTypes::Files,
@@ -177,12 +177,21 @@ fn get_and_update_options(manager: Arc<Mutex<Manager>>, weak: Weak<MainWindow>) 
 fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, finished: bool) {
     let _ = weak.upgrade_in_event_loop(move |weak| {
         let count = files.len() as i32;
+        let max_count = 100;
+        let max_len = 400;
         let mut sfiles: Vec<SFileInfo> = files
             .iter()
             .take(1000)
-            .map(|x| SFileInfo {
-                name: x.path.clone().into(),
-                data: x.content().clone().into(),
+            .map(|x| {
+                let mut content = x.content(max_count, max_len);
+                if x.matches.len() > max_count {
+                    content.push_str(&format!("\nand {} other lines", x.matches.len() - max_count));
+                };
+
+                SFileInfo {
+                    name: x.path.clone().into(),
+                    data: content.into(),
+                }
             })
             .collect();
         if count > 1000 {
@@ -212,7 +221,7 @@ fn set_options(weak: Weak<MainWindow>, manager: Arc<Mutex<Manager>>) {
         let ops = man.get_options();
         weak.set_case_sensitive(ops.name.case_sensitive);
         weak.set_content_case_sensitive(ops.content.case_sensitive);
-        weak.set_directory(ops.last_dir.clone().into());
+        weak.set_directory(ops.last_dir.into());
     });
 }
 
@@ -221,12 +230,12 @@ enum ExportType {
     Name,
 }
 
-impl Into<ExportType> for i32 {
-    fn into(self) -> ExportType {
-        match self {
-            x if x == ExportType::FullPath as i32 => ExportType::FullPath,
-            x if x == ExportType::Name as i32 => ExportType::Name,
-            _ => ExportType::FullPath,
+impl From<i32> for ExportType {
+    fn from(x: i32) -> Self {
+        match x {
+            1 => ExportType::FullPath,
+            2 => ExportType::Name,
+            _ => panic!("Not implemented"),
         }
     }
 }

@@ -97,10 +97,16 @@ impl Application for App {
             self.results
                 .iter()
                 .map(|x| {
+                    let max = 100;
+                    let maxlen = 200;
+                    let mut content = x.content(max, maxlen);
+                    if x.matches.len() > max {
+                        content.push_str(&format!("\nand {} other lines", x.matches.len() - max));
+                    }
                     Row::new()
                         .spacing(10)
                         .push(Text::new(&x.path).style(Color::from_rgb8(100, 200, 100)))
-                        .push(Text::new(&x.content()).width(Length::Fill))
+                        .push(Text::new(&content).width(Length::Fill))
                         .into()
                 })
                 .collect(),

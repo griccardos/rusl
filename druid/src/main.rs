@@ -264,7 +264,8 @@ impl AppDelegate<AppState> for Delegate {
         }
 
         if let Some(results) = cmd.get(RESULTS) {
-            const MAX_OUT: usize = 1000;
+            const MAX_NAMES: usize = 1000;
+            const MAX_CONTENT: usize = 10000;
             let re_name = RegexBuilder::new(&data.text_name).case_insensitive(!data.name_case_sensitive).build();
             let re_content = RegexBuilder::new(&data.text_contents)
                 .case_insensitive(!data.content_case_sensitive)
@@ -272,24 +273,32 @@ impl AppDelegate<AppState> for Delegate {
             let re_numbers = RegexBuilder::new(r"(^|\n)(\d+:)").build();
 
             if let SearchResult::InterimResult(fi) = results {
-                if data.visible.len() < MAX_OUT {
+                if data.visible.len() < MAX_NAMES {
                     data.visible
-                        .push_back(highlight_result(fi, re_name.clone(), re_content.clone(), re_numbers.clone()));
+                        .push_back(highlight_result(fi, re_name.clone(), re_content.clone(), re_numbers.clone(), 100));
                 }
             } else if let SearchResult::FinalResults(results) = results {
                 data.data = results.data.iter().map(|x| x.path.to_string()).collect();
 
+                let content_count: usize = results.data.iter().take(MAX_NAMES).map(|x| x.matches.len()).sum();
+                let mut max_per = usize::MAX;
+
+                if content_count > 0 {
+                    max_per = (MAX_CONTENT as f32 / content_count as f32 * results.data.iter().take(MAX_NAMES).count() as f32) as usize;
+                    max_per = max_per.max(1);
+                }
                 //create visible
                 //limited to fixed number of lines
                 //add colour and highlighting
+                //limit content
                 data.find_name = String::from("Find");
                 data.visible = results
                     .data
                     .iter()
-                    .take(MAX_OUT)
-                    .map(|x| highlight_result(x, re_name.clone(), re_content.clone(), re_numbers.clone()))
+                    .take(MAX_NAMES)
+                    .map(|x| highlight_result(x, re_name.clone(), re_content.clone(), re_numbers.clone(), max_per))
                     .collect();
-                if results.data.len() > MAX_OUT {
+                if results.data.len() > MAX_NAMES {
                     data.visible
                         .push_back(RichText::new(format!("...AND {} others", results.data.len() - 1000).into()));
                 }
@@ -321,17 +330,23 @@ fn highlight_result(
     re_name: Result<Regex, regex::Error>,
     re_content: Result<Regex, regex::Error>,
     re_numbers: Result<Regex, regex::Error>,
+    max_content_count: usize,
 ) -> RichText {
     let sym = if x.is_folder { "📁" } else { "📝" };
     let symlen = sym.as_bytes().len();
     let mut full = sym.to_string();
+    const MAX_LEN: usize = 400;
+    let content = x.content(max_content_count, MAX_LEN);
+    let mut content_with_extra = content.clone();
+    if !content.is_empty() && x.matches.len() > max_content_count {
+        content_with_extra.push_str(&format!("\nand {} other lines", x.matches.len() - max_content_count));
+    }
     full.push(' ');
     full.push_str(&x.path);
     let mut rich = if !x.matches.is_empty() {
-        full.push_str("> ");
         let start = full.len();
         full.push('\n');
-        full.push_str(&x.content());
+        full.push_str(&content_with_extra);
         let mut rich = rich_with_path(&full, &x.path, Color::rgb8(58, 150, 221));
         rich.add_attribute(start..full.len(), Attribute::text_color(Color::rgb8(164, 164, 164)));
         rich.add_attribute(0..symlen, Attribute::FontFamily(FontFamily::MONOSPACE));
@@ -349,8 +364,10 @@ fn highlight_result(
                 range.start += start + symlen + 1;
 
                 if range.end <= x.path.len() + symlen + 1 {
-                    rich.add_attribute(range.clone(), Attribute::Weight(FontWeight::BOLD));
-                    rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(189, 60, 71)));
+                    if full.is_char_boundary(range.start) && full.is_char_boundary(range.end) {
+                        rich.add_attribute(range.clone(), Attribute::Weight(FontWeight::BOLD));
+                        rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(189, 60, 71)));
+                    }
                 } else {
                     eprintln!("{range:?} is out of range of {}", x.path.len());
                 }
@@ -359,19 +376,19 @@ fn highlight_result(
     }
     //highlight matches in content:
     if !x.matches.is_empty() {
-        let content = x.content();
-
         if let Ok(re) = &re_content {
             for cap in re.captures_iter(&content) {
                 if let Some(mat) = cap.get(0) {
                     let mut range = mat.range();
                     if range.end <= content.len() {
-                        range.start += x.path.len() + 2 + symlen + 2;
-                        range.end += x.path.len() + 2 + symlen + 2;
-                        rich.add_attribute(range.clone(), Attribute::Weight(FontWeight::BOLD));
-                        rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(189, 60, 71)));
+                        range.start += x.path.len() + symlen + 2;
+                        range.end += x.path.len() + symlen + 2;
+                        if full.is_char_boundary(range.start) && full.is_char_boundary(range.end) {
+                            rich.add_attribute(range.clone(), Attribute::Weight(FontWeight::BOLD));
+                            rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(189, 60, 71)));
+                        }
                     } else {
-                        eprintln!("{range:?} is out of range of {}", x.content().len());
+                        eprintln!("{range:?} is out of range of {}", content.len());
                     }
                 }
             }
@@ -383,12 +400,12 @@ fn highlight_result(
                 if let Some(mat) = cap.get(0) {
                     let mut range = mat.range();
                     if range.end <= content.len() {
-                        range.start += x.path.len() + 2 + symlen + 2;
-                        range.end += x.path.len() + 2 + symlen + 2;
+                        range.start += x.path.len() + symlen + 2;
+                        range.end += x.path.len() + symlen + 2;
                         rich.add_attribute(range.clone(), Attribute::Weight(FontWeight::BOLD));
                         rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(17, 122, 13)));
                     } else {
-                        eprintln!("{range:?} is out of range of {}", x.content().len());
+                        eprintln!("{range:?} is out of range of {}", content.len());
                     }
                 }
             }

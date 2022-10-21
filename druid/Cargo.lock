@@ -1007,7 +1007,7 @@ checksum = "c0f80d65747a3e43d1596c7c5492d95d5edddaabd45a7fcdb02b95f644164966"
 
 [[package]]
 name = "librusl"
-version = "0.1.5"
+version = "0.1.7"
 dependencies = [
  "clipboard",
  "dirs",
@@ -1434,7 +1434,7 @@ dependencies = [
 
 [[package]]
 name = "rusl"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "druid",
  "embed-resource",
