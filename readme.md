@@ -10,7 +10,7 @@ Druid is currently the most feature complete and releases are Druid.
 
 Why the name rusl? Well, it's the sound made when you are searching through leaves or papers for something. Also it's 75% of the letters in rust!
 
-![image](https://user-images.githubusercontent.com/30464685/195122179-1786f94b-fd80-46a2-8838-806bda20ce0e.png)
+![image](https://user-images.githubusercontent.com/30464685/197233181-db1760dd-429f-48dc-b73a-6aea8f1c3743.png)
 
 
 ## Objectives
