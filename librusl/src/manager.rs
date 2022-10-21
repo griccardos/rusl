@@ -115,7 +115,7 @@ impl Manager {
 
     fn spawn_search(&self, search: Search) {
         let message_number = self.id;
-        eprintln!("Manager: Start Search {message_number} {:?}", Instant::now());
+        // eprintln!("Manager: Start Search {message_number} {:?}", Instant::now());
 
         let file_sender = self.internal_sender.clone();
         //reset search, and send type
@@ -137,7 +137,7 @@ impl Manager {
                 if let Err(err) = file_sender1.send(Message::Done(message_number, start.elapsed())) {
                     eprintln!("Manager: Could not send result {message_number} {err:?}");
                 } else {
-                    eprintln!("Manager: Done name Search {message_number} {:?}", Instant::now());
+                    // eprintln!("Manager: Done name Search {message_number} {:?}", Instant::now());
                 }
             });
         }
@@ -151,7 +151,7 @@ impl Manager {
                 let files = Manager::find_contents(&search.contents_text, &search.dir, None, options2, must_stop2);
                 file_sender.send(Message::ContentFiles(files, message_number, start.elapsed())).unwrap();
                 file_sender.send(Message::Done(message_number, start.elapsed())).unwrap();
-                eprintln!("Manager: Done content only search {message_number}  {:?}", Instant::now());
+                // eprintln!("Manager: Done content only search {message_number}  {:?}", Instant::now());
             });
         }
     }
@@ -328,7 +328,7 @@ fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sende
                 if number != latest_number {
                     return;
                 }
-                eprintln!("Received content {number}");
+                //eprintln!("Received content {number}");
                 //only update if new update (old updates are discarded)
                 for f in files {
                     final_names.push(f);
@@ -349,7 +349,7 @@ fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sende
                 if number != latest_number {
                     return;
                 }
-                eprintln!("Received Done {number}");
+                //eprintln!("Received Done {number}");
                 tot_elapsed += elapsed.to_owned();
 
                 let sort_type = ops.lock().unwrap().sort.clone();
