@@ -1,7 +1,11 @@
 //hide windows console
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{sync::mpsc, thread::spawn, time::Instant};
+use std::{
+    sync::mpsc,
+    thread::spawn,
+    time::{Duration, Instant},
+};
 
 use druid::{
     im::Vector,
@@ -43,6 +47,19 @@ struct AppState {
     name_follow_links: bool,
     name_ignore_dot: bool,
     content_case_sensitive: bool,
+    //regex
+    #[data(ignore)]
+    re_name: Result<Regex, regex::Error>,
+    #[data(ignore)]
+    re_content: Result<Regex, regex::Error>,
+    #[data(ignore)]
+    re_line: Result<Regex, regex::Error>,
+
+    //update
+    #[data(ignore)]
+    last_update: Instant,
+    #[data(ignore)]
+    interim_count: usize,
 }
 
 pub fn main() {
@@ -60,6 +77,7 @@ pub fn main() {
         start: Instant::now(),
         show_settings: false,
         searching: false,
+        interim_count: 0,
         find_name: String::from("Find"),
         //settings
         name_case_sensitive: ops.name.case_sensitive,
@@ -67,6 +85,12 @@ pub fn main() {
         name_follow_links: ops.name.follow_links,
         name_ignore_dot: ops.name.ignore_dot,
         content_case_sensitive: ops.content.case_sensitive,
+        //regex
+        re_name: Regex::new(""),
+        re_content: Regex::new(""),
+        re_line: Regex::new(r"(^|\n)(\d+:)"),
+        //update
+        last_update: Instant::now(),
     };
     let delegate = Delegate { manager: man };
 
@@ -225,6 +249,12 @@ impl AppDelegate<AppState> for Delegate {
 
             data.visible.clear();
             data.data.clear();
+            data.interim_count = 0;
+
+            data.re_name = RegexBuilder::new(&data.text_name).case_insensitive(!data.name_case_sensitive).build();
+            data.re_content = RegexBuilder::new(&data.text_contents)
+                .case_insensitive(!data.content_case_sensitive)
+                .build();
 
             data.message = rich("Searching...", Color::YELLOW);
             //set options
@@ -266,20 +296,25 @@ impl AppDelegate<AppState> for Delegate {
         if let Some(results) = cmd.get(RESULTS) {
             const MAX_NAMES: usize = 1000;
             const MAX_CONTENT: usize = 10000;
-            let re_name = RegexBuilder::new(&data.text_name).case_insensitive(!data.name_case_sensitive).build();
-            let re_content = RegexBuilder::new(&data.text_contents)
-                .case_insensitive(!data.content_case_sensitive)
-                .build();
-            let re_numbers = RegexBuilder::new(r"(^|\n)(\d+:)").build();
 
             if let SearchResult::InterimResult(fi) = results {
                 if data.visible.len() < MAX_NAMES {
-                    data.visible
-                        .push_back(highlight_result(fi, re_name.clone(), re_content.clone(), re_numbers.clone(), 100));
+                    data.visible.push_back(highlight_result(
+                        fi,
+                        data.re_name.clone(),
+                        data.re_content.clone(),
+                        data.re_line.clone(),
+                        100,
+                    ));
+                }
+                data.interim_count += 1;
+
+                if data.last_update.elapsed() > Duration::from_millis(100) {
+                    data.message = rich(&format!("Found {} Searching...", data.interim_count), Color::YELLOW);
+                    data.last_update = Instant::now();
                 }
             } else if let SearchResult::FinalResults(results) = results {
                 data.data = results.data.iter().map(|x| x.path.to_string()).collect();
-
                 let content_count: usize = results.data.iter().take(MAX_NAMES).map(|x| x.matches.len()).sum();
                 let mut max_per = usize::MAX;
 
@@ -296,7 +331,7 @@ impl AppDelegate<AppState> for Delegate {
                     .data
                     .iter()
                     .take(MAX_NAMES)
-                    .map(|x| highlight_result(x, re_name.clone(), re_content.clone(), re_numbers.clone(), max_per))
+                    .map(|x| highlight_result(x, data.re_name.clone(), data.re_content.clone(), data.re_line.clone(), max_per))
                     .collect();
                 if results.data.len() > MAX_NAMES {
                     data.visible
@@ -307,7 +342,7 @@ impl AppDelegate<AppState> for Delegate {
                 let foldercount = results.data.len() - filecount;
                 let mut string = format!("Found {filecount} files");
                 if foldercount > 0 {
-                    string += &format!(" and {foldercount} folders");
+                    string += &format!(" {foldercount} folders {} total", filecount + foldercount);
                 }
                 string += &format!(" in {:.3}s", data.start.elapsed().as_secs_f64());
 
