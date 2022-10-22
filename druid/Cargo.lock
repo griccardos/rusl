@@ -1434,7 +1434,7 @@ dependencies = [
 
 [[package]]
 name = "rusl"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "druid",
  "embed-resource",
