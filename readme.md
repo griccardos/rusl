@@ -37,6 +37,18 @@ Why the name rusl? Well, it's the sound made when you are searching through leav
 This project relies heavily on ripgrep and BurntSushi's libraries. 
 > Shout out to BurntSushi for the awesome work (https://github.com/BurntSushi)  
 
+## How to build
+- `git clone https://github.com/griccardos/rusl`
+- `cd rusl`
+- `cd druid` (or into other guis)
+- `cargo build --release`
+- `cd target/release`
+- `./rusl` 
+- Or copy to bin directory
+
+
+Linux/Druid requires gtk+3; see [GTK installation page](https://www.gtk.org/docs/installations/linux/) . (On ubuntu-based distro, run sudo apt-get install libgtk-3-dev )
+
 ## Contributions
 Contributions are welcome. You are also welcome to add a new GUI frontend in a new branch. 
 
@@ -72,7 +84,7 @@ Functionality Implemented
 | - Copy to clipboard   |&check;|&check;|&check;|&cross;| 
 | - Windows             |&check;|&check;|&check;|&check;| 
 | - Linux               |&check;|issues |&check;|&check;| 
-| - Mac                 |&check;|       |       |       | 
+| - Mac                 |&check;(slow gui)|       |       |       | 
 
 
 
