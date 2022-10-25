@@ -146,7 +146,7 @@ fn ui_builder() -> impl Widget<AppState> {
         .on_click(|ctx, _data, _env| ctx.submit_command(EXPORT))
         .fix_size(85., 40.);
     let lmessage = RawLabel::new().lens(AppState::message).padding(5.0).center().expand_width();
-    let butfolder: SizedBox<AppState> = if cfg!(macos) {
+    let butfolder: SizedBox<AppState> = if cfg!(target_os = "macos") {
         //rfd 0.6 does not work on mac. Cant update to 0.10 because druid uses old gtk.
         //so dont show on mac
         TextBox::new().lens(AppState::dir).fix_width(0.).into()
