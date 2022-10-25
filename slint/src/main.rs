@@ -1,5 +1,5 @@
 //hide windows console
-//#![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 
 use librusl::manager::{Manager, SearchResult};
 use librusl::options::{FTypes, Sort};
@@ -102,7 +102,6 @@ pub fn main() {
     let manager_sort = manager.clone();
     let results_sort = results.clone();
     mw.on_sort_changed(move || {
-        println!("sort changed");
         let weak = weak_sort.unwrap();
         let sort_new = weak.get_selected_sort().as_str().to_owned();
         let sort_new = match sort_new.as_str() {
@@ -199,8 +198,10 @@ fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, fin
                     content.push_str(&format!("\nand {} other lines", x.matches.len() - max_count));
                 };
 
+                let pre = if x.is_folder { "📁" } else { "📝" };
+
                 SFileInfo {
-                    name: x.path.clone().into(),
+                    name: format!("{pre}{}", x.path).into(),
                     data: content.into(),
                 }
             })

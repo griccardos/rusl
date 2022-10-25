@@ -65,8 +65,14 @@ export MainWindow := Window {
                         HorizontalLayout {
                             padding: 5px;
                             height:50px;
+                            Text { 
+                                text:"File name";
+                                width:100px;
+                                color: white;
+                                vertical-alignment: center;
+                             }
                             edit:= LineEdit { 
-                                placeholder-text:"File name";
+                                placeholder-text:"Regex file name search e.g. ^mai.*rs$ or r.st or ^best";
                                 height:40px;
                                 text <=> root.find-text;
                                 accepted => { root.search(); }
@@ -77,8 +83,14 @@ export MainWindow := Window {
                         HorizontalLayout { 
                             padding: 5px;
                             height:50px;
+                            Text { 
+                                text:"File contents";
+                                width:100px;
+                                color: white;
+                                vertical-alignment: center;
+                             }
                             LineEdit { 
-                                placeholder-text:"Text to find in contents";
+                                placeholder-text:"Regex content search e.g. str.{2}g";
                                 height:40px;
                                 text <=> root.content_find_text;
                                 accepted => { root.search(); }
@@ -90,6 +102,12 @@ export MainWindow := Window {
                         HorizontalLayout { 
                             padding: 5px;
                             height:50px;
+                            Text { 
+                                text:"Directory";
+                                width:100px;
+                                color: white;
+                                vertical-alignment: center;
+                             }
                             StandardButton { 
                                 text: "📁";
                                 height: 40px;
@@ -100,7 +118,6 @@ export MainWindow := Window {
                                 background: root.error-dir?red:transparent;
                                 height: root.error-dir?42px:40px;
                                 LineEdit { 
-                                placeholder-text:"Starting directory (optional)";
                                 height:40px;
                                 text <=> root.directory;
                                 edited => { root.dir-changed();} 
@@ -118,13 +135,44 @@ export MainWindow := Window {
                             width: 80px;
                             clicked => { search();  }
                          }
-                        Rectangle { width:10px; }
-                        StandardButton { 
+                        
+                         HorizontalLayout { 
+                            alignment: end;
+                        
+
+                         Text{text:"Sort"; height: 30px; color:white; vertical-alignment: center;}
+                         Rectangle { width:10px; }
+                         ComboBox {  
+                             height: 30px;
+                             width: 200px;
+                             model: ["None", "Path", "Name", "Extension"];
+                             current-value<=> root.selected_sort; 
+                             selected => { root.sort_changed(); }
+                         }
+                         Rectangle { width:10px; }
+                         StandardButton { 
                             text: "⚙️";
                             height: 40px;
                             width: 60px;
                             clicked => { root.show-options=!root.show-options;}
                          }
+                         Rectangle { width:10px; }
+                         exp:=StandardButton { 
+                             text:"Export";
+                             enabled<=>root.export_enabled;
+                             clicked => { popup.show(); }
+                          }
+                          
+                        
+                          popup := PopupWindow {
+                              x:exp.x - 10px;
+                              y:exp.y+exp.height;
+                             VerticalLayout {
+                                      StandardButton {  text: "Full paths"; clicked => { export(1); } }
+                                      StandardButton {   text: "Names"; clicked => { export(2); } }
+                              }
+                         }
+                        }
                         
                     }
                         if show-options:
@@ -208,55 +256,21 @@ export MainWindow := Window {
                 vertical-alignment: center;
             }
             }
-        HorizontalLayout { 
-            x:parent.width/2;
-            width: parent.width/2;
-            alignment: end;
-            padding-right: 10px;
-            padding-bottom: 10px;
-            VerticalLayout { 
-                alignment: end;
-            HorizontalLayout { 
-                height: 30px;
-            Text{text:"Sort"; height: 30px; color:white; vertical-alignment: center;}
-            Rectangle { width:10px; }
-            ComboBox {  
-                height: 30px;
-                width: 200px;
-                model: ["None", "Path", "Name", "Extension"];
-                current-value<=> root.selected_sort; 
-                selected => { root.sort_changed(); }
-            }
-            Rectangle { width:10px; }
-            exp:=StandardButton { 
-                text:"Export";
-                enabled<=>root.export_enabled;
-                clicked => { popup.show(); }
-             }
-             
-             popup := PopupWindow {
-                 x:exp.x - 10px;
-                 y:exp.y+exp.height;
-                VerticalLayout {
-                         StandardButton {  text: "Full paths"; clicked => { export(1); } }
-                         StandardButton {   text: "Names"; clicked => { export(2); } }
-                 }
-            }
-        }
-        }}
+      
         }
         Rectangle { 
             background:black;
             padding: 20px; 
          
         result_list:=ListView { 
-
+        
             for f in files: 
             HorizontalLayout{
                 alignment: start;
                 width: parent.width -20px;
 
                 VerticalLayout { 
+                    padding: 2px;
                     Text{
                         text:f.name;
                         color: rgb(58, 150, 221); 
