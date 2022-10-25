@@ -84,7 +84,7 @@ Functionality Implemented
 | - Copy to clipboard   |&check;|&check;|&check;|&cross;| 
 | - Windows             |&check;|&check;|&check;|&check;| 
 | - Linux               |&check;|*1 |&check;|&check;| 
-| - Mac                 |&check;*2|       |       |       | 
+| - Mac                 |&check;*2|&check;||       | 
 
 - *1 Build not working properly in linux, investigating
 - *2 Currently update is slow on MacOS, but has been fixed, and awaiting new version
@@ -121,7 +121,7 @@ To be fair, I did not spend a lot of time on this, so I left it for someone to c
 
 ### Druid
 (https://github.com/linebender/druid)
-Next up was Druid. I have used it in a personal project previously, and feel like it has a lot of potential. First off, it *is* more complicated than Slint, and there are a few complications like Data, Lens, Delegates etc., but the hurdles are surmountable. Also there is a lot of boilerplate to set up a basic widget.
+Next up was Druid. I have used it in a personal project previously, and feel like it has a lot of potential. First off, it is a little more complicated than Slint, and there are additional things to learn like Data, Lens etc. There is some boilerplate to set up a custom widget.
 
 However it feels like one can do almost everything they need, and if there is no existing widget, it gives us the tools to build our own widgets.
 I really like the feel of this.
@@ -136,7 +136,8 @@ My favourite in terms of professional look and feel.
 - Can be a bit verbose at times e.g. implementing a new widget
 - Cannot change window icon, need to use another crate
 - Cannot change titlebar icon
-- Flex is finnicky, sometimes cannot get it to do exactly what I want
+- Flex is finnicky, sometimes cannot always get it to do exactly what I want
+- Errors are sometimes confusing
 
 
 ### EGUI
