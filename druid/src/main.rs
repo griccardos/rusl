@@ -10,7 +10,7 @@ use std::{
 use druid::{
     im::Vector,
     text::{Attribute, RichText, RichTextBuilder},
-    widget::{Button, Checkbox, Controller, Either, Flex, Label, List, RadioGroup, RawLabel, Scroll, TextBox},
+    widget::{Button, Checkbox, Controller, Either, Flex, Label, List, RadioGroup, RawLabel, Scroll, SizedBox, TextBox},
     AppDelegate, AppLauncher, Code, Color, Command, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, Lens, Selector, Target, Widget,
     WidgetExt, WindowDesc,
 };
@@ -146,43 +146,54 @@ fn ui_builder() -> impl Widget<AppState> {
         .on_click(|ctx, _data, _env| ctx.submit_command(EXPORT))
         .fix_size(85., 40.);
     let lmessage = RawLabel::new().lens(AppState::message).padding(5.0).center().expand_width();
-    let butfolder = Button::new("📁")
-        .on_click(|_ctx, data: &mut AppState, _env| {
-            if let Some(folder) = rfd::FileDialog::new().pick_folder() {
-                data.dir = folder.to_string_lossy().to_string();
-            }
-        })
-        .fix_size(40., 40.);
+    let butfolder: SizedBox<AppState> = if cfg!(macos) {
+        //rfd 0.6 does not work on mac. Cant update to 0.10 because druid uses old gtk.
+        //so dont show on mac
+        TextBox::new().lens(AppState::dir).fix_width(0.).into()
+    } else {
+        Button::new("📁")
+            .on_click(|_ctx, data: &mut AppState, _env| {
+                if let Some(folder) = rfd::FileDialog::new().pick_folder() {
+                    data.dir = folder.to_string_lossy().to_string();
+                }
+            })
+            .fix_size(40., 30.)
+            .into()
+    };
 
     let list = Scroll::new(List::new(|| RawLabel::new().padding(1.0)).lens(AppState::visible).padding(10.))
         .background(Color::rgba8(0, 0, 0, 255))
         .expand();
 
     Flex::column()
+        .with_spacer(5.)
         .with_child(
             Flex::row()
                 .with_child(Label::new("File name").padding(5.0).fix_width(100.))
-                .with_flex_child(tname, 1.0),
+                .with_flex_child(tname, 1.0)
+                .with_spacer(5.),
         )
         .with_child(
             Flex::row()
                 .with_child(Label::new("Contents").padding(5.0).fix_width(100.))
-                .with_flex_child(tcontents, 1.0),
+                .with_flex_child(tcontents, 1.0)
+                .with_spacer(5.),
         )
         .with_child(
             Flex::row()
                 .with_child(Label::new("Directory").padding(5.0).fix_width(100.))
                 .with_child(butfolder)
-                .with_flex_child(tdir, 1.0),
+                .with_flex_child(tdir, 1.0)
+                .with_spacer(5.),
         )
         .with_child(
             Flex::row()
-                .with_flex_spacer(1.)
+                .with_spacer(5.)
                 .with_child(butfind)
                 .with_flex_spacer(1.)
                 .with_child(butset)
                 .with_child(butclip)
-                .with_spacer(10.),
+                .with_spacer(5.),
         )
         .with_child(settings_panel())
         .with_child(lmessage)
