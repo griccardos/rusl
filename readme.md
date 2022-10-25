@@ -83,10 +83,11 @@ Functionality Implemented
 | - Settings            |&check;|&check;|&check;|&cross;| 
 | - Copy to clipboard   |&check;|&check;|&check;|&cross;| 
 | - Windows             |&check;|&check;|&check;|&check;| 
-| - Linux               |&check;|issues |&check;|&check;| 
-| - Mac                 |&check;(slow gui)|       |       |       | 
+| - Linux               |&check;|*1 |&check;|&check;| 
+| - Mac                 |&check;*2|       |       |       | 
 
-
+- *1 Build not working properly in linux, investigating
+- *2 Currently update is slow on MacOS, but has been fixed, and awaiting new version
 
 ### Slint 
 This project started off using Slint (https://slint-ui.com/). It was really easy to get up and running and within 2 days had something relatively complete (with a few concessions made). 
