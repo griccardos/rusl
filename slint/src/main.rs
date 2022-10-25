@@ -1,5 +1,5 @@
 //hide windows console
-#![windows_subsystem = "windows"]
+//#![windows_subsystem = "windows"]
 
 use librusl::manager::{Manager, SearchResult};
 use librusl::options::{FTypes, Sort};
@@ -112,13 +112,11 @@ pub fn main() {
             "None" => Sort::None,
             _ => Sort::None,
         };
-        //TODO
+
         let mut manager_sort = manager_sort.lock().unwrap();
         manager_sort.set_sort(sort_new);
         let mut results_vec = results_sort.lock().unwrap().to_vec();
-        println!("about to sortt {}", results_vec.len());
         Manager::do_sort(&mut results_vec, sort_new);
-        println!("sorted {}", results_vec.len());
         *results_sort.lock().unwrap() = results_vec.clone();
 
         set_data(weak_sort.clone(), results_vec, Duration::from_secs(0), false);
@@ -137,14 +135,27 @@ pub fn main() {
     });
 
     //dirchange
-    let weak_dir_changed = weak;
+    let weak_dir_changed = weak.clone();
     mw.on_dir_changed(move || {
         let weak = weak_dir_changed.clone().unwrap();
         let dir = weak.get_directory().as_str().to_owned();
         if !PathBuf::from(dir).exists() {
             weak.set_error_dir(true);
+            weak.set_message("Not a valid directory".into());
         } else {
             weak.set_error_dir(false);
+            weak.set_message("".into());
+        }
+    });
+
+    //dirclicked
+    let weak_dir_clicked = weak;
+    mw.on_dir_clicked(move || {
+        let weak = weak_dir_clicked.clone().unwrap();
+        let dir = weak.get_directory().as_str().to_owned();
+        let new_dir = rfd::FileDialog::new().set_directory(dir).pick_folder();
+        if let Some(new_dir) = new_dir {
+            weak.set_directory(new_dir.to_str().unwrap_or(".").into());
         }
     });
 

@@ -25,7 +25,6 @@ export MainWindow := Window {
     property <[SFileInfo]> files;
     property <string> message:"Results";
     property <string> directory:".";
-    property <int> tab_height:80;
     property <bool> show_options;
     property <bool> export_enabled:false;
     property <string>selected_sort:"None";
@@ -35,6 +34,7 @@ export MainWindow := Window {
     callback search();
     callback export(int);
     callback dir_changed();
+    callback dir_clicked();
 
     forward-focus: edit;
 
@@ -47,12 +47,11 @@ export MainWindow := Window {
     property <string> content_find_text;
     property <bool>content_case_sensitive;
 
-    property <int>tindex;
-
     
     preferred-width: 1000px;
     preferred-height: 800px;
     min-width: 500px;
+    max-width: 2000px;
     default-font-size: 18px;
     default-font-weight: 200;
     background: #1F1B24;
@@ -60,15 +59,11 @@ export MainWindow := Window {
         padding: 5px;
         spacing: 20px;
         
-        TabWidget { 
-            height: tab_height*1px;
-            current-index<=>tindex;
-            Tab{
-                title: root.find-text==""?"Name":"Name*";
+       
                 Rectangle { 
+                    VerticalLayout { 
                         HorizontalLayout {
-                            y:10px; 
-                            padding: 10px;
+                            padding: 5px;
                             height:50px;
                             edit:= LineEdit { 
                                 placeholder-text:"File name";
@@ -76,28 +71,82 @@ export MainWindow := Window {
                                 text <=> root.find-text;
                                 accepted => { root.search(); }
                             }
-                            Rectangle { width:10px; }
-                            StandardButton { 
-                                text: "X";
-                                height: 40px;
-                                clicked => { root.find-text="";  }
-                             }
+                           
                         
                         }
+                        HorizontalLayout { 
+                            padding: 5px;
+                            height:50px;
+                            LineEdit { 
+                                placeholder-text:"Text to find in contents";
+                                height:40px;
+                                text <=> root.content_find_text;
+                                accepted => { root.search(); }
+                    
+                            }
+                           
+                        
+                        }
+                        HorizontalLayout { 
+                            padding: 5px;
+                            height:50px;
+                            StandardButton { 
+                                text: "📁";
+                                height: 40px;
+                                width: 60px;
+                                clicked => { root.dir-clicked();}
+                             }
+                            Rectangle {
+                                background: root.error-dir?red:transparent;
+                                height: root.error-dir?42px:40px;
+                                LineEdit { 
+                                placeholder-text:"Starting directory (optional)";
+                                height:40px;
+                                text <=> root.directory;
+                                edited => { root.dir-changed();} 
+                                accepted => { root.search(); }
+                            }
+                        }
+                    }
+                    HorizontalLayout { 
+                        padding: 5px;
+                        height:50px;
+                   
+                        StandardButton { 
+                            text: "Find";
+                            height: 40px;
+                            width: 80px;
+                            clicked => { search();  }
+                         }
+                        Rectangle { width:10px; }
+                        StandardButton { 
+                            text: "⚙️";
+                            height: 40px;
+                            width: 60px;
+                            clicked => { root.show-options=!root.show-options;}
+                         }
+                        
+                    }
                         if show-options:
                         HorizontalLayout { 
-                            padding: 10px;
-                            y:60px;
+                            padding: 5px;
                             Rectangle { 
-                                border-radius: 8px;
+                                border-radius: 4px;
                                 background: #ddd;
-                                height: 60px;
-                    
+                                VerticalLayout { 
+                                    padding: 10px;
+                                    
+                                Text { 
+                                    text:"Names"; 
+                                    height: 20px;
+                                    font-weight: 1000;
+                            }
                                 HorizontalLayout { 
-                                    x:20px;
                                     spacing: 10px;
+                                    padding: 0px;
                                     CheckBox { 
                                         text: "Case sensitive";
+                                        height: 30px;
                                         checked<=> root.case-sensitive;
                                     }
                                     HorizontalLayout { 
@@ -120,94 +169,33 @@ export MainWindow := Window {
                                         }
                                     }
                                 }
+                                Text { 
+                                    text:"Contents"; height:40px; 
+                                    vertical-alignment: bottom;
+                                    font-weight: 1000;
+                                }
+                                HorizontalLayout { 
+                                    spacing: 10px;
+                                    CheckBox { 
+                                        text: "Case sensitive";
+                                        height: 30px;
+                                        checked<=> root.content_case_sensitive;
+                                    }
+                                }
+                            }
                             }
                         }
                        
-                    }
-                    
-            }
-            Tab{
-                title:root.content_find_text==""?"Contents":"Contents*";
-                Rectangle { 
-                    
-                    HorizontalLayout { 
-                        padding: 10px;
-                        y:10px;
-                        height:50px;
-                        LineEdit { 
-                            placeholder-text:"Text to find in contents";
-                            height:40px;
-                            text <=> root.content_find_text;
-                            accepted => { root.search(); }
-                
-                        }
-                        Rectangle { width:10px; }
-                        StandardButton { 
-                            text: "X";
-                            height: 40px;
-                            clicked => { root.content-find-text="";   }
-                         }
-                    
-                    }
-                    if show-options:
-                    HorizontalLayout { 
-                        padding: 10px;
-                        y:60px;
-                
-                        Rectangle { 
-                            border-radius: 8px;
-                            background: #ddd;
-                            height: 60px;
-                
-                            HorizontalLayout { 
-                                x:20px;
-                                spacing: 10px;
-                                CheckBox { 
-                                    text: "Case sensitive";
-                                    checked<=> root.content_case_sensitive;
-                                }
-                            }
-                        }
+                 
                     }
                 }
-            }
-            
-        }
-        if root.tindex!=2:
-        VerticalLayout { 
-        HorizontalLayout { 
-            padding: 10px;
-            height:50px;
-            Rectangle {
-                background: root.error-dir?red:transparent;
-                height: root.error-dir?42px:40px;
-                LineEdit { 
-                placeholder-text:"Starting directory (optional)";
-                height:40px;
-                text <=> root.directory;
-                edited => { root.dir-changed();} 
-                accepted => { root.search(); }
-            }
-        }
-            Rectangle { width:10px; }
-            StandardButton { 
-                text: "⚙️";
-                height: 40px;
-                clicked => { root.show-options=!root.show-options;
-                   root.tab-height=root.show-options?150:80;
                     
-                 }
-             }
-             Rectangle { width:10px; }
-             StandardButton { 
-                 text: "Find";
-                 height: 40px;
-                 clicked => { search();  }
-              }
-        }
+        
+        VerticalLayout { 
+       
         Rectangle { 
             padding-left: 10px;
-            height: 80px;
+            height: 40px;
             
             VerticalLayout { 
                 alignment: end;
@@ -235,7 +223,7 @@ export MainWindow := Window {
             ComboBox {  
                 height: 30px;
                 width: 200px;
-                model: ["None","Path", "File name", "Extension"];
+                model: ["None", "Path", "Name", "Extension"];
                 current-value<=> root.selected_sort; 
                 selected => { root.sort_changed(); }
             }
