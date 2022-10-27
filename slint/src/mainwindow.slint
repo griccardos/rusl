@@ -15,6 +15,7 @@
 import{LineEdit,CheckBox,ListView,ComboBox,TabWidget,StandardButton ,TextEdit,Button } from "std-widgets.slint";
 
 export struct SFileInfo :={
+    pre:string,
     name:string,
     data:string
  }
@@ -271,11 +272,19 @@ export MainWindow := Window {
 
                 VerticalLayout { 
                     padding: 2px;
+                    HorizontalLayout { 
+                        if f.pre!="":
+                    Text{
+                        width: 40px;
+                        text:f.pre;
+                        color: white; 
+                    }
                     Text{
                         text:f.name;
                         color: rgb(58, 150, 221); 
                         overflow: elide;
                     }
+                }
                     if f.data!="":
                     Text{
                         text:f.data;
