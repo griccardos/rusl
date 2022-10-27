@@ -12,7 +12,7 @@
 //      - buttons images not working 
 //      - tab background not working
 
-import{LineEdit,CheckBox,ListView,ComboBox,TabWidget,StandardButton ,TextEdit } from "std-widgets.slint";
+import{LineEdit,CheckBox,ListView,ComboBox,TabWidget,StandardButton ,TextEdit,Button } from "std-widgets.slint";
 
 export struct SFileInfo :={
     name:string,
@@ -53,7 +53,7 @@ export MainWindow := Window {
     min-width: 500px;
     max-width: 2000px;
     default-font-size: 18px;
-    default-font-weight: 200;
+    
     background: #1F1B24;
     VerticalLayout { 
         padding: 5px;
@@ -67,7 +67,7 @@ export MainWindow := Window {
                             height:50px;
                             Text { 
                                 text:"File name";
-                                width:100px;
+                                width:130px;
                                 color: white;
                                 vertical-alignment: center;
                              }
@@ -85,7 +85,7 @@ export MainWindow := Window {
                             height:50px;
                             Text { 
                                 text:"File contents";
-                                width:100px;
+                                width:130px;
                                 color: white;
                                 vertical-alignment: center;
                              }
@@ -104,12 +104,12 @@ export MainWindow := Window {
                             height:50px;
                             Text { 
                                 text:"Directory";
-                                width:100px;
+                                width:130px;
                                 color: white;
                                 vertical-alignment: center;
                              }
                             StandardButton { 
-                                text: "📁";
+                                text: "🗁";
                                 height: 40px;
                                 width: 60px;
                                 clicked => { root.dir-clicked();}
@@ -140,17 +140,17 @@ export MainWindow := Window {
                             alignment: end;
                         
 
-                         Text{text:"Sort"; height: 30px; color:white; vertical-alignment: center;}
+                         Text{text:"Sort"; height: 40px; color:white; vertical-alignment: center;}
                          Rectangle { width:10px; }
                          ComboBox {  
-                             height: 30px;
+                             height: 40px;
                              width: 200px;
                              model: ["None", "Path", "Name", "Extension"];
                              current-value<=> root.selected_sort; 
                              selected => { root.sort_changed(); }
                          }
                          Rectangle { width:10px; }
-                         StandardButton { 
+                         Button { 
                             text: "⚙️";
                             height: 40px;
                             width: 60px;
@@ -187,7 +187,7 @@ export MainWindow := Window {
                                 Text { 
                                     text:"Names"; 
                                     height: 20px;
-                                    font-weight: 1000;
+                                    font-weight: 800;
                             }
                                 HorizontalLayout { 
                                     spacing: 10px;
@@ -220,7 +220,7 @@ export MainWindow := Window {
                                 Text { 
                                     text:"Contents"; height:40px; 
                                     vertical-alignment: bottom;
-                                    font-weight: 1000;
+                                    font-weight: 800;
                                 }
                                 HorizontalLayout { 
                                     spacing: 10px;

@@ -189,6 +189,7 @@ fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, fin
         let count = files.len() as i32;
         let max_count = 100;
         let max_len = 400;
+
         let mut sfiles: Vec<SFileInfo> = files
             .iter()
             .take(1000)
@@ -198,7 +199,10 @@ fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, fin
                     content.push_str(&format!("\nand {} other lines", x.matches.len() - max_count));
                 };
 
-                let pre = if x.is_folder { "📁" } else { "📝" };
+                let mut pre = if x.is_folder { "🗁" } else { " 🗏 " };
+                if weak.get_content_find_text().len() != 0 {
+                    pre = "";
+                }
 
                 SFileInfo {
                     name: format!("{pre}{}", x.path).into(),

@@ -83,11 +83,10 @@ Functionality Implemented
 | - Settings            |&check;|&check;|&check;|&cross;| 
 | - Copy to clipboard   |&check;|&check;|&check;|&cross;| 
 | - Windows             |&check;|&check;|&check;|&check;| 
-| - Linux               |&check;|*1 |&check;|&check;| 
-| - Mac                 |&check;*2|&check;||       | 
+| - Linux               |&check;|&check;|&check;|&check;| 
+| - Mac                 |&check;*1|&check;||       | 
 
-- *1 Build not working properly in linux, investigating
-- *2 Currently update is slow on MacOS, but has been fixed, and awaiting new version
+- *1 Currently gui update is slow on MacOS, but has been fixed in druid; awaiting new version
 
 ### Slint 
 This project started off using Slint (https://slint-ui.com/). It was really easy to get up and running and within 2 days had something relatively complete (with a few concessions made). 
