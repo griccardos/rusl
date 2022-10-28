@@ -84,7 +84,7 @@ Functionality Implemented
 | - Copy to clipboard   |&check;|&check;|&check;|&cross;| 
 | - Windows             |&check;|&check;|&check;|&check;| 
 | - Linux               |&check;|&check;|&check;|&check;| 
-| - Mac                 |&check;*1|&check;||       | 
+| - Mac                 |&check;*1|&check;|&check;|&check;| 
 
 - *1 Currently gui update is slow on MacOS, but has been fixed in druid; awaiting new version
 
