@@ -6,13 +6,12 @@ build = "build.rs"
 
 [dependencies]
 librusl={path="../librusl"}
-rfd = "0.10.0" #for selecting directory for gui
+rfd = "0.10.0" #for selecting directory slint = 
+slint = "0.3.1" #GUI
 
-#slint
-slint = "0.3.0" #GUI
 
 [build-dependencies]
-slint-build = "0.3.0" #slint GUI
+slint-build = "0.3.1" #slint GUI
 
 
 
