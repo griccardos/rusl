@@ -1,52 +1,79 @@
 //hide windows console
-#![windows_subsystem = "windows"]
+//#![windows_subsystem = "windows"]
 
-use std::{
-    sync::{mpsc},
-};
+use std::{cell::RefCell, sync::mpsc, time::Duration};
 
-use dioxus::prelude:: *;
+use dioxus::prelude::*;
 
-use librusl::{fileinfo::FileInfo, manager::Manager,  search::Search};
-
+use librusl::{fileinfo::FileInfo, manager::Manager, search::Search};
 
 pub fn main() {
-    // let props = Arc::new(Mutex::new(props));
-    // let props2 = props.clone();
-    // let props3 = props.clone();
-    //
-    // thread::spawn(move || loop {
-    //     let mut p = props3.lock().unwrap();
-    //     p.name.push_str(" and ");
-    //     sender.send(DioxusMessage::Set(p.name));
-    //     drop(p);
-    //     thread::sleep(Duration::from_secs(1));
-    // });
-    // dioxus::desktop::launch_with_props(app, props2, |c| c);
-    dioxus::desktop::launch(app);
+    dioxus_desktop::launch(app);
 }
 
 fn app(cx: Scope<()>) -> Element {
     let text_name = use_state(&cx, || "".to_string());
     let text_dir = use_state(&cx, || ".".to_string());
     let message = use_state(&cx, || "Started".to_string());
-    let data = use_state(&cx, || Vec::<FileInfo>::new());
-    let (s, _r) = mpsc::channel();
+    let data = use_state(&cx, || RefCell::new(Vec::<FileInfo>::new()));
+    let (s, r) = mpsc::channel();
     let man = use_ref(&cx, || Manager::new(s));
-    //let ops = use_state(&cx, || BothOptions::default());
 
-    // cx.spawn({
-    //     async move {
-    //         loop {
-    //             let files = r.recv().unwrap();
-    //             eprintln!("{:?}", files.data);
-    //             sleep(Duration::from_millis(100)).await
-    //         }
-    //     }
-    // });
+    //run in background
+    // loop, if find then output, else sleep for a while
+    use_coroutine(&cx, |_: UnboundedReceiver<()>| {
+        let data = data.clone();
+        let message = message.clone();
+        async move {
+            loop {
+                match r.try_recv() {
+                    Ok(files) => {
+                        match files {
+                            librusl::manager::SearchResult::FinalResults(fe) => {
+                                eprintln!("Found {}", fe.data.len());
+                                let current = data.current();
+                                let mut mutable = current.borrow_mut();
+                                mutable.clear();
+                                let found_count = fe.data.len();
+                                 if found_count<1000{
+                                mutable.extend(fe.data);
+                                }else{
+                                    
+                                    mutable.extend(fe.data.into_iter().take(1000));
+                                    mutable.push(FileInfo { path: format!("...and {} more",found_count-1000), matches: vec![], ext: "".to_string(), name: "".to_string(), is_folder: false });
+                                };
+                                message.set(format!("Found {} in {:.2}s", found_count, fe.duration.as_secs_f32()));
+                            }
+                            librusl::manager::SearchResult::InterimResult(ir) => {
+                                let current = data.current();
+                                let mut mutable = current.borrow_mut();
+                                let mes = format!("Found {}, searching...", mutable.len());
+                                //eprintln!("{mes}");
+                                message.set(mes);
+                               
+                                if mutable.len()<1000{
+                                    
+                                mutable.push(ir);
+                                }else if mutable.len()==1000{
+                                    mutable.push(FileInfo { path: format!("...and others"), matches: vec![], ext: "".to_string(), name: "".to_string(), is_folder: false });
+                                }
+                            }
+                        }
+                    }
+
+                    Err(_) => {
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                    }
+                }
+            }
+        }
+    });
 
     cx.render(rsx!(
-        
+        head {
+            link { rel: "stylesheet", href: "mui.min.css" }
+        }
+        body {
             div{
                 class: "py-8 px-6",
                 input{
@@ -69,13 +96,12 @@ fn app(cx: Scope<()>) -> Element {
                     dir: text_dir.to_string(),
                     ..Default::default()
                 }));
-                eprintln!("test");
-                message.set(format!("found {}",data.len()));
+                
             },"Find"}
             ul{
-                data.iter().map(|x|rsx!{li{a{"{x.name}"}}})
+                data.current().borrow().iter().map(|x|rsx!{li{a{"{x.path}"}}})
             }
         }
-
+    }
     ))
 }

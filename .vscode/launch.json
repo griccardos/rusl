@@ -13,7 +13,7 @@
                     "build",
                     "--bin=rusl",
                     "--package=rusl",
-                   // "--manifest-path=./slint/Cargo.toml" //use to debug a specific exe
+                    "--manifest-path=./dioxus/Cargo.toml" //use to debug a specific exe
                 ],
                 "filter": {
                     "name": "rusl",
