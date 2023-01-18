@@ -29,7 +29,7 @@ Why the name rusl? Well, it's the sound made when you are searching through leav
     - [X] Druid
     - [X] Slint
     - [X] EGUI
-    - [ ] Dioxus
+    - [X] Dioxus
     - [ ] fltk
     - [ ] Relm4
     - [X] Iced
@@ -57,34 +57,34 @@ Each library is on a different branch. Change branch to select different UI.
 
 Summary
 ----------
-|                       |Druid   |Slint|EGUI  |ICED   |
-|-                      |---:    |----:|---:  |----:  |
-|Dependencies           |**171** |439  |243   |312    |
-|Build time cold (s)    |18      |40   |**16**|42     |
-|Lines                  |403     |479  | 229  |**198**|
-|File size windows (kb) |**4739**|6926 |7071  |10276  |
+|                       |Druid   |Slint|EGUI  |ICED   |Dioxus|
+|-                      |---:    |----:|---:  |----:  |--:   |
+|Dependencies           |**171** |439  |243   |312    |337   |
+|Build time cold (s)    |18      |40   |**16**|42     | 56   |
+|Lines                  |403     |479  | 229  |**198**| 236  |
+|File size windows (kb) |**4739**|6926 |7071  |10276  |7026  |
 
 UI 
 --------
-|                       |Druid  |Slint  |EGUI   |ICED   |
-|-                      |:-----:|:-----:|:-----:|:-----:|
-| - Toolbar icon        |&check;|&check;|&check;|&check;|
-| - Window icon         |&cross;|&check;|&check;|&check;| 
-| - Tab between fields  |&check;|&check;|&check;|&cross;| 
-| - paste into textbox  |&check;|&check;|&check;|&check;| 
+|                       |Druid  |Slint  |EGUI   |ICED   |Dioxus |
+|-                      |:-----:|:-----:|:-----:|:-----:|:-----:|
+| - Toolbar icon        |&check;|&check;|&check;|&check;|&check;|
+| - Window icon         |&cross;|&check;|&check;|&check;|&check;| 
+| - Tab between fields  |&check;|&check;|&check;|&cross;|&check;| 
+| - paste into textbox  |&check;|&check;|&check;|&check;|&check;| 
 
 Functionality Implemented 
 --------
-|                       |Druid  |Slint  |EGUI   |ICED   |
-|-                      |:-----:|:---:  |:--:   |:---:  |
-| - Filename search     |&check;|&check;|&check;|&check;|
-| - Content search      |&check;|&check;|&check;|&check;| 
-| - Match Highlighting  |&check;|&cross;|&cross;|&cross;| 
-| - Settings            |&check;|&check;|&check;|&cross;| 
-| - Copy to clipboard   |&check;|&check;|&check;|&cross;| 
-| - Windows             |&check;|&check;|&check;|&check;| 
-| - Linux               |&check;|&check;|&check;|&check;| 
-| - Mac                 |&check;*1|&check;|&check;|&check;| 
+|                       |Druid  |Slint  |EGUI     |ICED   |Dioxus   |
+|-                      |:-----:|:---:  |:--:     |:---:  |:---:  |
+| - Filename search     |&check;|&check;|&check;  |&check;|&check;|
+| - Content search      |&check;|&check;|&check;  |&check;|&check;| 
+| - Match Highlighting  |&check;|&cross;|&cross;  |&cross;|&cross;| 
+| - Settings            |&check;|&check;|&check;  |&cross;|&cross;| 
+| - Copy to clipboard   |&check;|&check;|&check;  |&cross;|&cross;| 
+| - Windows             |&check;|&check;|&check;  |&check;|&check;| 
+| - Linux               |&check;|&check;|&check;  |&check;|| 
+| - Mac                 |&check;*1|&check;|&check;|&check;|| 
 
 - *1 Currently gui update is slow on MacOS, but has been fixed in druid; awaiting new version
 
@@ -114,9 +114,17 @@ Will keep an eye on this one.
 ### Dioxus 
 (https://dioxuslabs.com/)
 
-I heard a lot of good things about dioxus, so I tried setting that up. However having never used react or something similar, I struggled a bit. I wasn't quite sure of the difference in use_state, use_future, use_hook, and when one would use each case.
-To be fair, I did not spend a lot of time on this, so I left it for someone to contribute to the dioxus branch so we can get something going there. 
+Having never used react or something similar, I struggled a bit with hooks. However after a bit of time, and as the documentation became better, was able to get a solution
+working. Needed to use async and `use_coroutine` to run in the background and check for results. Other than that it was easy to set up user interface if you are familiar with front end web development.
 
+#### Pros
+- few lines of code
+- availability of thousands different web frameworks that can be used
+
+#### Cons
+- resizing of window has flickering due to use of webview
+- hooks are perhaps more difficult to understand if one has never used React
+- limited formatting in `rsx!` - would like to see formatter here
 
 ### Druid
 (https://github.com/linebender/druid)

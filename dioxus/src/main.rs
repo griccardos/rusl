@@ -5,39 +5,31 @@ use std::{cell::RefCell, sync::mpsc, time::Duration};
 
 use dioxus::prelude::*;
 
-use dioxus_desktop::Config;
+use dioxus_desktop::{tao::window::Icon, Config, WindowBuilder};
 use librusl::{fileinfo::FileInfo, manager::Manager, search::Search};
 
 pub fn main() {
+    let mut html = include_str!("../index.html").to_string();
+    html = html.replace("CUSTOM_CSS", include_str!("../mui.min.css"));
+    html = html.replace("CUSTOM_JS", include_str!("../mui.min.js"));
+
     dioxus_desktop::launch_cfg(
         app,
-        Config::new().with_custom_index(
-            r#"
-
-            <!DOCTYPE html>
-<html>
-  <head>
-  <link rel="stylesheet" href="./mui.min.css"></link> 
-  <title>rusl</title>
-  <script src: "./mui.min.js"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <style>body { 
-        background-color: black; 
-        color:white;
-    }
-    input::placeholder{
-        color:gray!important
-    }
-    </style>
-  </head>
-  <body>
-    <div id="main"></div>
-  </body>
-</html>
-            "#
-            .into(),
-        ),
+        Config::new()
+            .with_window(WindowBuilder::new().with_title("rusl").with_window_icon(Some(load_icon())))
+            .with_custom_index(html),
     );
+}
+
+fn load_icon() -> Icon {
+    let (icon_rgba, icon_width, icon_height) = {
+        let image = image::load_from_memory(include_bytes!("icons/icon.png")).unwrap().into_rgba8();
+        let (width, height) = image.dimensions();
+        let rgba = image.into_raw();
+        (rgba, width, height)
+    };
+
+    Icon::from_rgba(icon_rgba, icon_width, icon_height).unwrap()
 }
 
 fn app(cx: Scope<()>) -> Element {
