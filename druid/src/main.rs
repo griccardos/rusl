@@ -146,20 +146,13 @@ fn ui_builder() -> impl Widget<AppState> {
         .on_click(|ctx, _data, _env| ctx.submit_command(EXPORT))
         .fix_size(85., 40.);
     let lmessage = RawLabel::new().lens(AppState::message).padding(5.0).center().expand_width();
-    let butfolder: SizedBox<AppState> = if cfg!(target_os = "macos") {
-        //rfd 0.6 does not work on mac. Cant update to 0.10 because druid uses old gtk.
-        //so dont show on mac
-        TextBox::new().lens(AppState::dir).fix_width(0.).into()
-    } else {
-        Button::new("📁")
-            .on_click(|_ctx, data: &mut AppState, _env| {
-                if let Some(folder) = rfd::FileDialog::new().pick_folder() {
-                    data.dir = folder.to_string_lossy().to_string();
-                }
-            })
-            .fix_size(40., 30.)
-            .into()
-    };
+    let butfolder: SizedBox<AppState> = Button::new("📁")
+        .on_click(|_ctx, data: &mut AppState, _env| {
+            if let Some(folder) = rfd::FileDialog::new().pick_folder() {
+                data.dir = folder.to_string_lossy().to_string();
+            }
+        })
+        .fix_size(40., 30.);
 
     let list = Scroll::new(List::new(|| RawLabel::new().padding(1.0)).lens(AppState::visible).padding(10.))
         .background(Color::rgba8(0, 0, 0, 255))
@@ -375,13 +368,13 @@ impl AppDelegate<AppState> for Delegate {
                 if filecount > 0 {
                     string += &format!(" {filecount} file");
                     if filecount > 1 {
-                        string.push_str("s");
+                        string.push('s');
                     }
                 }
                 if foldercount > 0 {
                     string += &format!(" {foldercount} folder");
                     if foldercount > 1 {
-                        string.push_str("s");
+                        string.push('s');
                     }
                 }
                 if filecount > 0 && foldercount > 0 {

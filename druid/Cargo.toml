@@ -1,16 +1,14 @@
 [package]
 name = "rusl"
-version = "0.1.8"
+version = "0.2.0"
 edition = "2021"
 build = "build.rs"
 description = "search gui"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 librusl = { path="../librusl"}
-rfd = "0.6" #for selecting directory for gui
-druid  = {  git ="https://github.com/linebender/druid", features=["im"]} #GUI
+rfd = "0.11.0" #for selecting directory for gui
+druid  ={version= "0.8.2", features=["im"]} #GUI
 regex = "1.6.0"
 
 [build-dependencies]
