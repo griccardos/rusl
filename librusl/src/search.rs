@@ -8,8 +8,8 @@ impl Default for Search {
     fn default() -> Self {
         Self {
             dir: ".".to_string(),
-            name_text: "".to_string(),
-            contents_text: "".to_string(),
+            name_text: String::new(),
+            contents_text: String::new(),
         }
     }
 }

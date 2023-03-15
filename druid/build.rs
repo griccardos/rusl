@@ -1,3 +1,5 @@
+//This adds icon for windows.
+//For OSX use `cargo bundle`
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(windows)]
     {

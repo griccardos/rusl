@@ -79,13 +79,13 @@ impl Manager {
         self.spawn_search(search);
     }
 
-    pub fn save_and_quit(&mut self) {
-        save_settings(&mut self.options.lock().unwrap());
+    pub fn save_and_quit(&self) {
+        save_settings(&self.options.lock().unwrap());
         self.internal_sender.send(Message::Quit).expect("Quit");
     }
 
-    pub fn save(&mut self) {
-        save_settings(&mut self.options.lock().unwrap());
+    pub fn save(&self) {
+        save_settings(&self.options.lock().unwrap());
     }
 
     pub fn dir_is_valid(&self, dir: &str) -> bool {
@@ -353,7 +353,7 @@ fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sende
                 //eprintln!("Received Done {number}");
                 tot_elapsed += elapsed.to_owned();
 
-                let sort_type = ops.lock().unwrap().sort.clone();
+                let sort_type = ops.lock().unwrap().sort;
                 Manager::do_sort(&mut final_names, sort_type);
                 let results = SearchResult::FinalResults(FinalResults {
                     id: latest_number,
