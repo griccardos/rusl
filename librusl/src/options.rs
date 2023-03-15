@@ -5,10 +5,15 @@ pub struct Options {
     //general options
     #[serde(default)]
     pub sort: Sort,
+    #[serde(default)]
     pub last_dir: String,
+    #[serde(default)]
     pub name_history: Vec<String>,
+    #[serde(default)]
     pub content_history: Vec<String>,
+    #[serde(default)]
     pub name: NameOptions,
+    #[serde(default)]
     pub content: ContentOptions,
 }
 
@@ -27,11 +32,22 @@ impl Default for Options {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct NameOptions {
+    #[serde(default)]
     pub case_sensitive: bool,
+    #[serde(default)]
     pub file_types: FTypes,
+    #[serde(default)]
     pub same_filesystem: bool,
+    #[serde(default)]
     pub follow_links: bool,
+    #[serde(default = "bool_true")]
     pub ignore_dot: bool,
+    #[serde(default = "bool_true")]
+    pub use_gitignore: bool,
+}
+
+fn bool_true() -> bool {
+    true
 }
 
 impl Default for NameOptions {
@@ -42,12 +58,14 @@ impl Default for NameOptions {
             same_filesystem: false,
             follow_links: false,
             ignore_dot: true,
+            use_gitignore: true,
         }
     }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct ContentOptions {
+    #[serde(default)]
     pub case_sensitive: bool,
 }
 
@@ -60,9 +78,10 @@ pub enum Sort {
     Extension,
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Debug, Default)]
 pub enum FTypes {
     Files,
     Directories,
+    #[default]
     All,
 }

@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{
+    ptr,
     sync::mpsc,
     thread::spawn,
     time::{Duration, Instant},
@@ -11,8 +12,8 @@ use druid::{
     im::Vector,
     text::{Attribute, RichText, RichTextBuilder},
     widget::{Button, Checkbox, Controller, Either, Flex, Label, List, RadioGroup, RawLabel, Scroll, SizedBox, TextBox},
-    AppDelegate, AppLauncher, Code, Color, Command, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, Lens, Selector, Target, Widget,
-    WidgetExt, WindowDesc,
+    AppDelegate, AppLauncher, Code, Color, Command, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, HasRawWindowHandle, Lens,
+    RawWindowHandle, Selector, Target, Widget, WidgetExt, WindowDesc, WindowHandle,
 };
 use regex::{Regex, RegexBuilder};
 
@@ -48,6 +49,7 @@ struct AppState {
     name_follow_links: bool,
     name_ignore_dot: bool,
     name_search_file_type: SearchFileType,
+    name_use_gitignore: bool,
     content_case_sensitive: bool,
     //regex
     #[data(ignore)]
@@ -86,6 +88,7 @@ pub fn main() {
         name_same_filesystem: ops.name.same_filesystem,
         name_follow_links: ops.name.follow_links,
         name_ignore_dot: ops.name.ignore_dot,
+        name_use_gitignore: ops.name.use_gitignore,
         name_search_file_type: SearchFileType::All,
         content_case_sensitive: ops.content.case_sensitive,
         //regex
@@ -200,6 +203,7 @@ fn settings_panel() -> impl Widget<AppState> {
             .with_child(Checkbox::new("Case sensitive").lens(AppState::name_case_sensitive).align_left())
             .with_child(Checkbox::new("Same filesystem").lens(AppState::name_same_filesystem).align_left())
             .with_child(Checkbox::new("Ignore hidden (dot)").lens(AppState::name_ignore_dot).align_left())
+            .with_child(Checkbox::new("Use gitignore").lens(AppState::name_use_gitignore).align_left())
             .with_child(Checkbox::new("Follow links").lens(AppState::name_follow_links).align_left())
             .with_child(
                 RadioGroup::row(vec![
@@ -280,6 +284,7 @@ impl AppDelegate<AppState> for Delegate {
             ops.name.same_filesystem = data.name_same_filesystem;
             ops.content.case_sensitive = data.content_case_sensitive;
             ops.name.ignore_dot = data.name_ignore_dot;
+            ops.name.use_gitignore = data.name_use_gitignore;
             ops.name.file_types = data.name_search_file_type.clone().into();
 
             self.manager.set_options(ops);
@@ -394,6 +399,10 @@ impl AppDelegate<AppState> for Delegate {
     fn window_removed(&mut self, _id: druid::WindowId, _data: &mut AppState, _env: &druid::Env, _ctx: &mut druid::DelegateCtx) {
         //options are set on search, so we save them
         self.manager.save_and_quit();
+    }
+
+    fn window_added(&mut self, _id: druid::WindowId, handle: druid::WindowHandle, _data: &mut AppState, _env: &Env, _ctx: &mut druid::DelegateCtx) {
+        set_window_icon(&handle);
     }
 }
 
@@ -512,5 +521,42 @@ impl From<SearchFileType> for FTypes {
             SearchFileType::Files => FTypes::Files,
             SearchFileType::Folders => FTypes::Directories,
         }
+    }
+}
+
+/// Modified From https://github.com/linebender/druid/issues/1162#issuecomment-1009864303
+/// Sets the window icon at runtime.
+///
+/// Once Druid supports this natively, this function can be scrapped.
+#[cfg(windows)]
+use winapi::{
+    shared::windef::{HICON, HWND__},
+    um::{
+        libloaderapi::GetModuleHandleW,
+        winuser::{LoadImageW, SendMessageW, ICON_BIG, ICON_SMALL, IDI_APPLICATION, IMAGE_ICON, LR_DEFAULTSIZE, LR_SHARED, LR_VGACOLOR, WM_SETICON},
+    },
+};
+fn set_window_icon(handle: &WindowHandle) {
+    let raw_handle = handle.raw_window_handle();
+
+    #[allow(clippy::single_match)]
+    match raw_handle {
+        RawWindowHandle::Win32(win_handle) => unsafe {
+            #[cfg(windows)]
+            {
+                let icon: isize = {
+                    // Passing NULL means the executable file is selected
+                    let h_instance = GetModuleHandleW(ptr::null());
+                    // Don't need MAKEINTRESOURCEW() here because IDI_APPLICATION is already
+                    LoadImageW(h_instance, IDI_APPLICATION, IMAGE_ICON, 0, 0, LR_SHARED | LR_DEFAULTSIZE | LR_VGACOLOR).cast::<HICON>() as isize
+                };
+
+                // Shown at the top of the window
+                dbg!(SendMessageW(win_handle.hwnd.cast::<HWND__>(), WM_SETICON, ICON_SMALL as usize, icon,));
+                // Shown in the Alt+Tab dialog
+                dbg!(SendMessageW(win_handle.hwnd.cast::<HWND__>(), WM_SETICON, ICON_BIG as usize, icon,));
+            }
+        },
+        _ => {}
     }
 }

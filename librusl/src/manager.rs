@@ -173,6 +173,7 @@ impl Manager {
             .same_file_system(options.name.same_filesystem)
             .threads(num_cpus::get())
             .hidden(options.name.ignore_dot)
+            .git_ignore(options.name.use_gitignore)
             .build_parallel();
 
         //walk dir
@@ -418,9 +419,15 @@ fn load_options() -> Options {
     ops
 }
 
-fn save_settings(ops: &mut Options) {
+fn save_settings(ops: &Options) {
+    let mut save_ops = ops.clone();
+    //only save last few history
+    let count = 20;
+    save_ops.name_history = save_ops.name_history.into_iter().rev().take(count).rev().collect();
+    save_ops.content_history = save_ops.content_history.into_iter().rev().take(count).rev().collect();
+
     if let Some(file) = get_or_create_settings_path() {
-        let result = toml::to_string_pretty(ops);
+        let result = toml::to_string_pretty(&save_ops);
         if let Ok(data) = result {
             let write_result = std::fs::write(file, data);
             if write_result.is_err() {
@@ -440,18 +447,41 @@ mod tests {
 
     #[test]
     fn find_names() {
+        let mut dir = std::env::temp_dir();
+        println!("Using Temporary directory: {}", dir.display());
+
+        //create new directory in here, and create a file with the relevant text
+        dir.push("rusltestdir");
+        if dir.exists() {
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+        if std::fs::create_dir_all(&dir).is_err() {
+            panic!("could not create temp dir");
+        }
+
+        let mut file1 = dir.clone();
+        file1.push("temp.csv");
+
+        if std::fs::write(&file1, "hello\nthere 41 go").is_err() {
+            panic!("could not create file");
+        }
+
         let (s, r) = channel();
         let mut man = Manager::new(s);
         man.search(Search {
-            dir: "/temp".to_string(),
+            dir: file1.to_string_lossy().to_string(),
             name_text: "temp.csv".to_string(),
             contents_text: "41".to_string(),
         });
 
-        thread::sleep(Duration::from_secs(1));
         if let Ok(mess) = r.recv() {
             println!("{mess:?}");
+            match mess {
+                SearchResult::FinalResults(_) => panic!(),
+                SearchResult::InterimResult(fi) => {
+                    assert_eq!(fi.matches.len(), 1);
+                }
+            }
         }
-        assert!(false)
     }
 }

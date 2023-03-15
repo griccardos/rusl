@@ -1,18 +1,21 @@
 [package]
 name = "rusl"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 build = "build.rs"
 description = "search gui"
 
 [dependencies]
 librusl = { path="../librusl"}
-rfd = "0.11.0" #for selecting directory for gui
-druid  ={version= "0.8.2", features=["im"]} #GUI
-regex = "1.6.0"
+rfd = "0.11.2" #for selecting directory for gui
+druid  ={ version = "0.8.3", features = ["im", "raw-win-handle"] } #GUI
+regex = "1.7.1"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["windef"] } #for icon in windows
 
 [build-dependencies]
-embed-resource="1.7.3" #for icon
+winres ="0.1.12"#for icon in windows
 
 #cargo bundle for MacOS
 [package.metadata.bundle]

@@ -1,16 +1,16 @@
 [package]
 name = "librusl"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 description = "main rusl library"
 
 [dependencies]
-regex = "1.6.0" # for pattern matching
-num_cpus = "1.13" # for parallel search
-grep = "0.2.10" #ripgrep
-ignore = "0.4.18" #parallel walker from ripgrep
+regex = "1.7.1" # for pattern matching
+num_cpus = "1.15.0" # for parallel search
+grep = "0.2.11" #ripgrep
+ignore = "0.4.20" #parallel walker from ripgrep
 walkdir = "2.3.2" #walker from ripgrep
 clipboard = "0.5.0" #for clipboard
 dirs = "4.0.0" #for getting config file
-serde = { version="1.0.145", features=["derive"]}  #save config
-toml = "0.5.8" #config format
+serde = { version="1.0.156", features=["derive"]}  #save config
+toml = "0.7.3" #config format
