@@ -94,6 +94,7 @@ fn app(cx: Scope<()>) -> Element {
                                     });
                                 }
                             }
+                            librusl::manager::SearchResult::SearchErrors(_) => { /*todo show errors*/ }
                         }
                     }
 

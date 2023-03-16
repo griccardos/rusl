@@ -186,6 +186,7 @@ impl Application for App {
                                 self.results.push(res)
                             }
                         }
+                        SearchResult::SearchErrors(_) => { /*todo show errors*/ }
                     }
                 }
             }

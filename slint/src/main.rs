@@ -60,6 +60,7 @@ pub fn main() {
                     }
                     let _ = weak.upgrade_in_event_loop(move |weak| weak.set_message(format!("Found {counter} ...").into()));
                 }
+                SearchResult::SearchErrors(_) => {}
             };
         }
     });

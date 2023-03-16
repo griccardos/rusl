@@ -23,18 +23,23 @@ struct MyWrite {
 
 pub const SEPARATOR: &str = r"\0\1\2\3\4";
 
+#[derive(Default)]
+pub struct ContentResults {
+    pub results: Vec<String>,
+    pub errors: Vec<String>,
+}
 pub fn search_contents(
     pattern: &str,
     paths: &[OsString],
     allowed_files: Option<HashSet<String>>,
     ops: ContentOptions,
     must_stop: Arc<AtomicBool>,
-) -> Vec<String> {
+) -> ContentResults {
     let case_insensitive = !ops.case_sensitive;
-
+    let mut errors = vec![];
     let matcher = RegexMatcherBuilder::new().case_insensitive(case_insensitive).build(pattern);
     if matcher.is_err() {
-        return vec![];
+        return ContentResults::default();
     }
     let matcher = matcher.unwrap();
 
@@ -57,20 +62,20 @@ pub fn search_contents(
             let file = file.unwrap();
             let result = searcher.search_file(&matcher, &file, printer.sink_with_path(&matcher, &path));
             if let Err(err) = result {
-                eprintln!("{}: {}", path, err);
+                errors.push(err.to_string());
             }
         }
     } else {
         for path in paths {
             for result in WalkDir::new(path) {
                 if must_stop.load(Ordering::Relaxed) {
-                    return vec![];
+                    return ContentResults::default();
                 }
 
                 let dent = match result {
                     Ok(dent) => dent,
                     Err(err) => {
-                        eprintln!("{}", err);
+                        errors.push(err.to_string());
                         continue;
                     }
                 };
@@ -79,14 +84,16 @@ pub fn search_contents(
                     continue;
                 }
                 let result = searcher.search_path(&matcher, dent.path(), printer.sink_with_path(&matcher, dent.path()));
-
                 if let Err(err) = result {
-                    eprintln!("{}: {}", dent.path().display(), err);
+                    errors.push(err.to_string());
                 }
             }
         }
     }
-    printer.into_inner().into_inner().string().split('\n').map(|x| x.to_string()).collect()
+    ContentResults {
+        results: printer.into_inner().into_inner().string().split('\n').map(|x| x.to_string()).collect(),
+        errors,
+    }
 }
 impl MyWrite {
     pub fn string(&self) -> String {

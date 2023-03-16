@@ -245,6 +245,7 @@ fn spawn_receiver(rx: std::sync::mpsc::Receiver<SearchResult>, results_thread: A
                     //TODO. currently only final results are loaded.
                     //this is to show interim results as they are received
                 }
+                SearchResult::SearchErrors(_) => { /*todo show errors*/ }
             };
         } else {
             println!("error recv");

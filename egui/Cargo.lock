@@ -1355,7 +1355,7 @@ dependencies = [
 
 [[package]]
 name = "librusl"
-version = "0.1.9"
+version = "0.2.0"
 dependencies = [
  "clipboard",
  "dirs",
@@ -1947,7 +1947,7 @@ dependencies = [
 
 [[package]]
 name = "rusl"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "eframe",
  "embed-resource",

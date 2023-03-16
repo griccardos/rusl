@@ -2,8 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{
-    ptr,
-    sync::mpsc,
+    sync::{mpsc, Arc},
     thread::spawn,
     time::{Duration, Instant},
 };
@@ -12,14 +11,14 @@ use druid::{
     im::Vector,
     text::{Attribute, RichText, RichTextBuilder},
     widget::{Button, Checkbox, Controller, Either, Flex, Label, List, RadioGroup, RawLabel, Scroll, SizedBox, TextBox},
-    AppDelegate, AppLauncher, Code, Color, Command, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, HasRawWindowHandle, Lens,
-    RawWindowHandle, Selector, Target, Widget, WidgetExt, WindowDesc, WindowHandle,
+    AppDelegate, AppLauncher, Code, Color, Command, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, HasRawWindowHandle, Lens, Selector,
+    Target, Widget, WidgetExt, WindowDesc,
 };
 use regex::{Regex, RegexBuilder};
 
 use librusl::{
     fileinfo::FileInfo,
-    manager::{Manager, SearchResult},
+    manager::{FinalResults, Manager, SearchResult},
     options::FTypes,
     search::Search,
 };
@@ -31,16 +30,22 @@ pub const UPDATEMESSAGE: Selector<String> = Selector::new("message");
 pub const EXPORT: Selector = Selector::new("export");
 pub const EXPORTSINGLE: Selector<String> = Selector::new("exportsingle");
 
+const MAX_NAMES: usize = 1000;
+const MAX_CONTENT: usize = 10000;
 #[derive(Data, Clone, Lens)]
 struct AppState {
     text_name: String,
     text_contents: String,
     dir: String,
     message: RichText,
+    error_message: String,
+    showing_errors: bool,
     visible: Vector<RichText>,
+    errors: Vector<String>,
     find_name: String,
     searching: bool,
     data: Vector<String>,
+
     start: Instant,
     show_settings: bool,
     //settings
@@ -64,6 +69,10 @@ struct AppState {
     last_update: Instant,
     #[data(ignore)]
     interim_count: usize,
+
+    //results
+    #[data(ignore)]
+    raw_data: Arc<Option<FinalResults>>,
 }
 
 pub fn main() {
@@ -72,11 +81,14 @@ pub fn main() {
     let ops = man.get_options();
 
     let data = AppState {
-        text_name: "".to_string(),
-        text_contents: "".to_string(),
+        text_name: String::new(),
+        text_contents: String::new(),
         dir: ops.last_dir.to_string(),
         message: RichText::new("Ready to search".into()),
+        error_message: String::new(),
+        showing_errors: false,
         data: Vector::new(),
+        errors: Vector::new(),
         visible: Vector::new(),
         start: Instant::now(),
         show_settings: false,
@@ -97,6 +109,8 @@ pub fn main() {
         re_line: Regex::new(r"(^|\n)(\d+:)"),
         //update
         last_update: Instant::now(),
+
+        raw_data: Arc::new(None),
     };
     let delegate = Delegate { manager: man };
 
@@ -149,6 +163,22 @@ fn ui_builder() -> impl Widget<AppState> {
         .on_click(|ctx, _data, _env| ctx.submit_command(EXPORT))
         .fix_size(85., 40.);
     let lmessage = RawLabel::new().lens(AppState::message).padding(5.0).center().expand_width();
+    let berrors = Either::new(
+        |data: &AppState, _env| data.error_message.is_empty(),
+        Label::new(""),
+        Button::dynamic(|state: &AppState, _env| state.error_message.clone())
+            .fix_height(40.)
+            .on_click(|_ctx, data, _env| {
+                if data.showing_errors {
+                    set_visible(data, VisibleType::Results);
+                } else {
+                    set_visible(data, VisibleType::Errors);
+                }
+                data.showing_errors = !data.showing_errors;
+            }),
+    );
+
+    // RawLabel::new().lens(AppState::error_message).padding(5.0).fix_width(80.).align_right();
     let butfolder: SizedBox<AppState> = Button::new("📁")
         .on_click(|_ctx, data: &mut AppState, _env| {
             if let Some(folder) = rfd::FileDialog::new().pick_folder() {
@@ -192,7 +222,7 @@ fn ui_builder() -> impl Widget<AppState> {
                 .with_spacer(5.),
         )
         .with_child(settings_panel())
-        .with_child(lmessage)
+        .with_child(Flex::row().with_flex_child(lmessage, 1.).with_flex_child(berrors, 0.))
         .with_flex_child(list, 1.0)
 }
 fn settings_panel() -> impl Widget<AppState> {
@@ -269,6 +299,7 @@ impl AppDelegate<AppState> for Delegate {
 
             data.visible.clear();
             data.data.clear();
+            data.errors.clear();
             data.interim_count = 0;
 
             data.re_name = RegexBuilder::new(&data.text_name).case_insensitive(!data.name_case_sensitive).build();
@@ -277,6 +308,7 @@ impl AppDelegate<AppState> for Delegate {
                 .build();
 
             data.message = rich("Searching...", Color::YELLOW);
+            data.error_message = String::new();
             //set options
             let mut ops = self.manager.get_options();
             ops.name.case_sensitive = data.name_case_sensitive;
@@ -316,27 +348,125 @@ impl AppDelegate<AppState> for Delegate {
         }
 
         if let Some(results) = cmd.get(RESULTS) {
-            const MAX_NAMES: usize = 1000;
-            const MAX_CONTENT: usize = 10000;
+            match results {
+                SearchResult::FinalResults(results) => {
+                    data.data = results.data.iter().map(|x| x.path.to_string()).collect();
+                    data.raw_data = Arc::new(Some(results.clone()));
 
-            if let SearchResult::InterimResult(fi) = results {
-                if data.visible.len() < MAX_NAMES {
-                    data.visible.push_back(highlight_result(
-                        fi,
-                        data.re_name.clone(),
-                        data.re_content.clone(),
-                        data.re_line.clone(),
-                        100,
-                    ));
-                }
-                data.interim_count += 1;
+                    set_visible(data, VisibleType::Results);
 
-                if data.last_update.elapsed() > Duration::from_millis(100) {
-                    data.message = rich(&format!("Found {} Searching...", data.interim_count), Color::YELLOW);
-                    data.last_update = Instant::now();
+                    let filecount = results.data.iter().filter(|x| !x.is_folder).count();
+                    let foldercount = results.data.len() - filecount;
+                    let mut string = String::new();
+
+                    if filecount == 0 && foldercount == 0 {
+                        string.push_str("Nothing found")
+                    } else {
+                        string.push_str("Found")
+                    }
+
+                    if filecount > 0 {
+                        string += &format!(" {filecount} file");
+                        if filecount > 1 {
+                            string.push('s');
+                        }
+                    }
+                    if foldercount > 0 {
+                        string += &format!(" {foldercount} folder");
+                        if foldercount > 1 {
+                            string.push('s');
+                        }
+                    }
+                    if filecount > 0 && foldercount > 0 {
+                        string += &format!(" {} total", filecount + foldercount);
+                    }
+
+                    string += &format!(" in {:.3}s", data.start.elapsed().as_secs_f64());
+
+                    if !data.errors.is_empty() {
+                        let mut str = format!("{} error", data.errors.len());
+                        if data.errors.len() > 1 {
+                            str.push_str("s");
+                        }
+                        data.error_message = str;
+                    }
+
+                    data.message = RichText::new(string.into());
                 }
-            } else if let SearchResult::FinalResults(results) = results {
-                data.data = results.data.iter().map(|x| x.path.to_string()).collect();
+                SearchResult::InterimResult(fi) => {
+                    if data.visible.len() < MAX_NAMES {
+                        data.visible.push_back(highlight_result(
+                            fi,
+                            data.re_name.clone(),
+                            data.re_content.clone(),
+                            data.re_line.clone(),
+                            100,
+                        ));
+                    }
+                    data.interim_count += 1;
+
+                    if data.last_update.elapsed() > Duration::from_millis(100) {
+                        data.message = rich(&format!("Found {} Searching...", data.interim_count), Color::YELLOW);
+                        data.last_update = Instant::now();
+                    }
+                }
+                SearchResult::SearchErrors(errs) => data.errors.extend(errs.clone()),
+            }
+
+            return Handled::Yes;
+        }
+
+        druid::Handled::No
+    }
+
+    fn window_removed(&mut self, _id: druid::WindowId, _data: &mut AppState, _env: &druid::Env, _ctx: &mut druid::DelegateCtx) {
+        //options are set on search, so we save them
+        self.manager.save_and_quit();
+    }
+
+    /// Modified From https://github.com/linebender/druid/issues/1162#issuecomment-1009864303
+    /// Sets the window icon at runtime.
+    ///
+    /// Once Druid supports this natively, this function can be scrapped.
+    #[cfg(windows)]
+    fn window_added(&mut self, _id: druid::WindowId, handle: druid::WindowHandle, _data: &mut AppState, _env: &Env, _ctx: &mut druid::DelegateCtx) {
+        use druid::RawWindowHandle;
+        use std::ptr;
+        use winapi::{
+            shared::windef::{HICON, HWND__},
+            um::{
+                libloaderapi::GetModuleHandleW,
+                winuser::{
+                    LoadImageW, SendMessageW, ICON_BIG, ICON_SMALL, IDI_APPLICATION, IMAGE_ICON, LR_DEFAULTSIZE, LR_SHARED, LR_VGACOLOR, WM_SETICON,
+                },
+            },
+        };
+
+        let raw_handle = handle.raw_window_handle();
+        #[allow(clippy::single_match)]
+        match raw_handle {
+            RawWindowHandle::Win32(win_handle) => unsafe {
+                let icon: isize = {
+                    // Passing NULL means the executable file is selected
+                    let h_instance = GetModuleHandleW(ptr::null());
+                    // Don't need MAKEINTRESOURCEW() here because IDI_APPLICATION is already
+                    LoadImageW(h_instance, IDI_APPLICATION, IMAGE_ICON, 0, 0, LR_SHARED | LR_DEFAULTSIZE | LR_VGACOLOR).cast::<HICON>() as isize
+                };
+
+                // Shown at the top of the window
+                SendMessageW(win_handle.hwnd.cast::<HWND__>(), WM_SETICON, ICON_SMALL as usize, icon);
+                // Shown in the Alt+Tab dialog
+                SendMessageW(win_handle.hwnd.cast::<HWND__>(), WM_SETICON, ICON_BIG as usize, icon);
+            },
+            _ => {}
+        }
+    }
+}
+
+fn set_visible(data: &mut AppState, result_type: VisibleType) {
+    match result_type {
+        VisibleType::Results => {
+            if let Some(results) = &*data.raw_data {
                 let content_count: usize = results.data.iter().take(MAX_NAMES).map(|x| x.matches.len()).sum();
                 let mut max_per = usize::MAX;
 
@@ -359,51 +489,15 @@ impl AppDelegate<AppState> for Delegate {
                     data.visible
                         .push_back(RichText::new(format!("...AND {} others", results.data.len() - 1000).into()));
                 }
-
-                let filecount = results.data.iter().filter(|x| !x.is_folder).count();
-                let foldercount = results.data.len() - filecount;
-                let mut string = String::new();
-
-                if filecount == 0 && foldercount == 0 {
-                    string.push_str("Nothing found")
-                } else {
-                    string.push_str("Found")
-                }
-
-                if filecount > 0 {
-                    string += &format!(" {filecount} file");
-                    if filecount > 1 {
-                        string.push('s');
-                    }
-                }
-                if foldercount > 0 {
-                    string += &format!(" {foldercount} folder");
-                    if foldercount > 1 {
-                        string.push('s');
-                    }
-                }
-                if filecount > 0 && foldercount > 0 {
-                    string += &format!(" {} total", filecount + foldercount);
-                }
-
-                string += &format!(" in {:.3}s", data.start.elapsed().as_secs_f64());
-
-                data.message = RichText::new(string.into());
             }
-            return Handled::Yes;
         }
-
-        druid::Handled::No
+        VisibleType::Errors => data.visible = data.errors.iter().take(MAX_NAMES).map(|x| rich(x, Color::WHITE)).collect(),
     }
+}
 
-    fn window_removed(&mut self, _id: druid::WindowId, _data: &mut AppState, _env: &druid::Env, _ctx: &mut druid::DelegateCtx) {
-        //options are set on search, so we save them
-        self.manager.save_and_quit();
-    }
-
-    fn window_added(&mut self, _id: druid::WindowId, handle: druid::WindowHandle, _data: &mut AppState, _env: &Env, _ctx: &mut druid::DelegateCtx) {
-        set_window_icon(&handle);
-    }
+enum VisibleType {
+    Results,
+    Errors,
 }
 
 fn highlight_result(
@@ -521,42 +615,5 @@ impl From<SearchFileType> for FTypes {
             SearchFileType::Files => FTypes::Files,
             SearchFileType::Folders => FTypes::Directories,
         }
-    }
-}
-
-/// Modified From https://github.com/linebender/druid/issues/1162#issuecomment-1009864303
-/// Sets the window icon at runtime.
-///
-/// Once Druid supports this natively, this function can be scrapped.
-#[cfg(windows)]
-use winapi::{
-    shared::windef::{HICON, HWND__},
-    um::{
-        libloaderapi::GetModuleHandleW,
-        winuser::{LoadImageW, SendMessageW, ICON_BIG, ICON_SMALL, IDI_APPLICATION, IMAGE_ICON, LR_DEFAULTSIZE, LR_SHARED, LR_VGACOLOR, WM_SETICON},
-    },
-};
-fn set_window_icon(handle: &WindowHandle) {
-    let raw_handle = handle.raw_window_handle();
-
-    #[allow(clippy::single_match)]
-    match raw_handle {
-        RawWindowHandle::Win32(win_handle) => unsafe {
-            #[cfg(windows)]
-            {
-                let icon: isize = {
-                    // Passing NULL means the executable file is selected
-                    let h_instance = GetModuleHandleW(ptr::null());
-                    // Don't need MAKEINTRESOURCEW() here because IDI_APPLICATION is already
-                    LoadImageW(h_instance, IDI_APPLICATION, IMAGE_ICON, 0, 0, LR_SHARED | LR_DEFAULTSIZE | LR_VGACOLOR).cast::<HICON>() as isize
-                };
-
-                // Shown at the top of the window
-                dbg!(SendMessageW(win_handle.hwnd.cast::<HWND__>(), WM_SETICON, ICON_SMALL as usize, icon,));
-                // Shown in the Alt+Tab dialog
-                dbg!(SendMessageW(win_handle.hwnd.cast::<HWND__>(), WM_SETICON, ICON_BIG as usize, icon,));
-            }
-        },
-        _ => {}
     }
 }

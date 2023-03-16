@@ -21,6 +21,7 @@ pub enum Message {
     Done(usize, Duration),
     ContentFiles(Vec<FileInfo>, usize, Duration),
     StartSearch(usize),
+    FileErrors(Vec<String>),
     Quit,
 }
 
@@ -28,8 +29,9 @@ pub enum Message {
 pub enum SearchResult {
     FinalResults(FinalResults),
     InterimResult(FileInfo),
+    SearchErrors(Vec<String>),
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FinalResults {
     pub data: Vec<FileInfo>,
     pub duration: Duration,
@@ -115,7 +117,6 @@ impl Manager {
 
     fn spawn_search(&self, search: Search) {
         let message_number = self.id;
-        // eprintln!("Manager: Start Search {message_number} {:?}", Instant::now());
 
         let file_sender = self.internal_sender.clone();
         //reset search, and send type
@@ -136,8 +137,6 @@ impl Manager {
                 Manager::find_names(&search1, options1, message_number, file_sender1.clone(), must_stop1);
                 if let Err(err) = file_sender1.send(Message::Done(message_number, start.elapsed())) {
                     eprintln!("Manager: Could not send result {message_number} {err:?}");
-                } else {
-                    // eprintln!("Manager: Done name Search {message_number} {:?}", Instant::now());
                 }
             });
         }
@@ -149,9 +148,11 @@ impl Manager {
             thread::spawn(move || {
                 let start = Instant::now();
                 let files = Manager::find_contents(&search.contents_text, &search.dir, None, options2, must_stop2);
-                file_sender.send(Message::ContentFiles(files, message_number, start.elapsed())).unwrap();
+                file_sender
+                    .send(Message::ContentFiles(files.results, message_number, start.elapsed()))
+                    .unwrap();
+                file_sender.send(Message::FileErrors(files.errors)).unwrap();
                 file_sender.send(Message::Done(message_number, start.elapsed())).unwrap();
-                // eprintln!("Manager: Done content only search {message_number}  {:?}", Instant::now());
             });
         }
     }
@@ -190,7 +191,7 @@ impl Manager {
                 let dent = match result {
                     Ok(dent) => dent,
                     Err(err) => {
-                        eprintln!("{}", err);
+                        let _ = file_sender.send(Message::FileErrors(vec![err.to_string()]));
                         return ignore::WalkState::Continue;
                     }
                 };
@@ -222,17 +223,26 @@ impl Manager {
                     let mut must_add = true;
                     let mut matches = vec![];
                     if !search.contents_text.is_empty() {
-                        let cont = Manager::find_contents(
-                            &search.contents_text,
-                            dir,
-                            Some(HashSet::from_iter([dent.path().to_string_lossy().to_string()])),
-                            options.clone(),
-                            must_stop.clone(),
-                        );
-                        if cont.is_empty() {
+                        if fs_type.is_dir() {
                             must_add = false;
                         } else {
-                            matches = cont[0].matches.clone();
+                            //check if contents match
+                            let cont = Manager::find_contents(
+                                &search.contents_text,
+                                dir,
+                                Some(HashSet::from_iter([dent.path().to_string_lossy().to_string()])),
+                                options.clone(),
+                                must_stop.clone(),
+                            );
+                            if cont.results.is_empty() {
+                                must_add = false;
+                            } else {
+                                matches = cont.results[0].matches.clone();
+                            }
+
+                            if !cont.errors.is_empty() {
+                                file_sender.send(Message::FileErrors(cont.errors)).unwrap();
+                            }
                         }
                     }
 
@@ -263,8 +273,16 @@ impl Manager {
         });
     }
 
-    fn find_contents(text: &str, dir: &str, allowed_files: Option<HashSet<String>>, options: Options, must_stop: Arc<AtomicBool>) -> Vec<FileInfo> {
-        let strings = rgtools::search_contents(text, &[OsString::from_str(dir).unwrap()], allowed_files, options.content, must_stop);
+    fn find_contents(
+        text: &str,
+        dir: &str,
+        allowed_files: Option<HashSet<String>>,
+        options: Options,
+        must_stop: Arc<AtomicBool>,
+    ) -> ContentFileInfoResults {
+        let content_results = rgtools::search_contents(text, &[OsString::from_str(dir).unwrap()], allowed_files, options.content, must_stop);
+        let strings = content_results.results;
+        let errors = content_results.errors;
 
         let file_line_content: Vec<Vec<&str>> = strings
             .iter()
@@ -295,7 +313,10 @@ impl Manager {
             });
         }
 
-        hm.into_values().collect()
+        ContentFileInfoResults {
+            results: hm.into_values().collect(),
+            errors,
+        }
     }
 
     pub fn do_sort(vec: &mut [FileInfo], sort: Sort) {
@@ -308,6 +329,12 @@ impl Manager {
     }
 }
 
+#[derive(Default)]
+pub struct ContentFileInfoResults {
+    pub results: Vec<FileInfo>,
+    pub errors: Vec<String>,
+}
+
 fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sender<SearchResult>, ops: Arc<Mutex<Options>>) {
     let mut final_names = vec![];
     let mut latest_number = 0;
@@ -315,7 +342,6 @@ fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sende
     loop {
         let message = internal_receiver.recv();
         if message.is_err() {
-            //eprintln!("unknown message: {:?}", message.err());
             continue;
         }
         let message = message.unwrap();
@@ -329,7 +355,6 @@ fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sende
                 if number != latest_number {
                     return;
                 }
-                //eprintln!("Received content {number}");
                 //only update if new update (old updates are discarded)
                 for f in files {
                     final_names.push(f);
@@ -341,7 +366,6 @@ fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sende
                 if number != latest_number {
                     return;
                 }
-                //eprintln!("Received file {number}");
                 //send to output
                 final_names.push(file.clone());
                 external_sender.send(SearchResult::InterimResult(file)).unwrap();
@@ -350,7 +374,6 @@ fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sende
                 if number != latest_number {
                     return;
                 }
-                //eprintln!("Received Done {number}");
                 tot_elapsed += elapsed.to_owned();
 
                 let sort_type = ops.lock().unwrap().sort;
@@ -366,6 +389,10 @@ fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sende
             }
 
             Message::Quit => break,
+            Message::FileErrors(err) => {
+                // eprintln!("Err: {err:?}");
+                external_sender.send(SearchResult::SearchErrors(err)).unwrap()
+            }
         }
     }
 }
@@ -481,6 +508,7 @@ mod tests {
                 SearchResult::InterimResult(fi) => {
                     assert_eq!(fi.matches.len(), 1);
                 }
+                SearchResult::SearchErrors(_) => panic!(),
             }
         }
     }
