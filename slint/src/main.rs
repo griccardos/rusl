@@ -26,7 +26,7 @@ pub fn main() {
     let results: Arc<Mutex<Vec<FileInfo>>> = Arc::new(Mutex::new(vec![]));
 
     //gui window
-    let mw = MainWindow::new();
+    let mw = MainWindow::new().unwrap();
     let weak = mw.as_weak();
 
     set_options(weak.clone(), manager.clone());
@@ -160,7 +160,7 @@ pub fn main() {
     });
 
     //run window until quit
-    mw.run();
+    mw.run().expect("Could not run");
 
     //save options
     manager.lock().unwrap().save_and_quit();

@@ -7,10 +7,8 @@ use std::{
 };
 
 use iced::{
-    button::{self},
-    executor, scrollable, text_input,
-    window::icon,
-    Application, Button, Color, Column, Command, Element, Length, Row, Settings, Space, Text, TextInput, Theme,
+    executor, widget::scrollable, widget::Button, widget::Column, widget::Row, widget::Space, widget::Text, widget::TextInput, window::icon,
+    Application, Color, Command, Element, Length, Settings, Theme,
 };
 
 use librusl::{
@@ -27,18 +25,6 @@ struct App {
     manager: Manager,
     receiver: Receiver<SearchResult>,
     message: String,
-
-    states: States,
-}
-
-#[derive(Default)]
-struct States {
-    find_button: button::State,
-    dir_button: button::State,
-    name_state: text_input::State,
-    contents_state: text_input::State,
-    directory_state: text_input::State,
-    scroll: scrollable::State,
 }
 
 #[derive(Debug, Clone)]
@@ -53,14 +39,14 @@ pub enum Message {
 
 pub fn main() {
     let mut sets = Settings::default();
-    sets.default_text_size = 20;
+    sets.default_text_size = 20.;
     sets.antialiasing = true;
     let image = image::load_from_memory_with_format(include_bytes!("icons/icon.png"), image::ImageFormat::Png)
         .unwrap()
         .into_rgba8();
     let (wid, hei) = image.dimensions();
     let icon = image.into_raw();
-    sets.window.icon = Some(icon::Icon::from_rgba(icon, wid, hei).unwrap());
+    sets.window.icon = Some(icon::from_rgba(icon, wid, hei).unwrap());
     App::run(sets).unwrap();
 }
 
@@ -77,7 +63,6 @@ impl Application for App {
             contents: "".to_string(),
             message: "".to_string(),
             directory: ".".to_string(),
-            states: States::default(),
             results: vec![],
             manager: Manager::new(s),
             receiver: r,
@@ -89,10 +74,12 @@ impl Application for App {
         "rusl".into()
     }
 
-    fn view(&mut self) -> Element<Self::Message> {
-        let name = TextInput::new(&mut self.states.name_state, "Find file name", &self.name, Message::NameChanged).padding(4);
-        let contents = TextInput::new(&mut self.states.contents_state, "Find contents", &self.contents, Message::ContentsChanged).padding(4);
-        let dir = TextInput::new(&mut self.states.directory_state, "", &self.directory, Message::DirectoryChanged).padding(4);
+    fn view(&self) -> Element<Self::Message> {
+        let name = TextInput::new("Find file name", &self.name).padding(4).on_input(Message::NameChanged);
+        let contents = TextInput::new("Find contents", &self.contents)
+            .on_input(Message::ContentsChanged)
+            .padding(4);
+        let dir = TextInput::new("", &self.directory).on_input(Message::DirectoryChanged).padding(4);
         let res = Column::with_children(
             self.results
                 .iter()
@@ -105,40 +92,43 @@ impl Application for App {
                     }
                     Row::new()
                         .spacing(10)
-                        .push(Text::new(&x.path).style(Color::from_rgb8(100, 200, 100)))
-                        .push(Text::new(&content).width(Length::Fill))
+                        .push(
+                            Column::new()
+                                .push(Text::new(&x.path).style(Color::from_rgb8(100, 200, 100)))
+                                .push(Text::new(content).width(Length::Fill)),
+                        )
                         .into()
                 })
                 .collect(),
         );
-        let res = scrollable::Scrollable::new(&mut self.states.scroll).push(res);
+        let res = scrollable::Scrollable::new(res);
         Column::new()
             .padding(10)
             .spacing(10)
             .push(
                 Row::new()
-                    .push(Text::new("File name").width(Length::Units(100)))
-                    .push(Space::new(iced::Length::Units(10), iced::Length::Shrink))
+                    .push(Text::new("File name").width(Length::Fixed(100.)))
+                    .push(Space::new(iced::Length::Fixed(10.), iced::Length::Shrink))
                     .push(name),
             )
             .push(
                 Row::new()
-                    .push(Text::new("File contents").width(Length::Units(100)))
-                    .push(Space::new(iced::Length::Units(10), iced::Length::Shrink))
+                    .push(Text::new("File contents").width(Length::Fixed(100.)))
+                    .push(Space::new(iced::Length::Fixed(10.), iced::Length::Shrink))
                     .push(contents),
             )
             .push(
                 Row::new()
-                    .push(Text::new("Directory").width(Length::Units(100)))
-                    .push(Button::new(&mut self.states.dir_button, Text::new("+")).on_press(Message::OpenDirectory))
-                    .push(Space::new(iced::Length::Units(10), iced::Length::Shrink))
+                    .push(Text::new("Directory").width(Length::Fixed(100.)))
+                    .push(Button::new(Text::new("+")).on_press(Message::OpenDirectory))
+                    .push(Space::new(iced::Length::Fixed(10.), iced::Length::Shrink))
                     .push(dir),
             )
             .push(
                 Row::new()
                     .spacing(15)
                     .align_items(iced::Alignment::End)
-                    .push(Button::new(&mut self.states.find_button, Text::new("Find")).on_press(Message::FindPressed))
+                    .push(Button::new(Text::new("Find")).on_press(Message::FindPressed))
                     .push(Text::new(&self.message)),
             )
             .push(res)

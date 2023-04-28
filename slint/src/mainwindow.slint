@@ -1,35 +1,21 @@
-//SLINT COMMENTS:
-// 1. how to import a rust struct?
-// 2. how to change checkbox text colour?
-// 3. how to split out portion of view into a new file, then a. access properties callbacks that are in root from that file or b. access callbacks from rust in the secondary file?
-// 4. cannot set background colour of layouts
-// 5. no tab events
-// 6. No Selectable text without scroll bar or editing
-// 7. no hyperlinks in text
-// 8. unable to format slint file
-// 9. padding in listview not working
-// 10. linux issues: 
-//      - buttons images not working 
-//      - tab background not working
-
 import{LineEdit,CheckBox,ListView,ComboBox,TabWidget,StandardButton ,TextEdit,Button } from "std-widgets.slint";
 
-export struct SFileInfo :={
+export struct SFileInfo {
     pre:string,
     name:string,
     data:string
  }
 
-export MainWindow := Window {
+export component MainWindow inherits Window {
     title: "Rusl";
     icon: @image-url("icons/icon.png");
-    property <[SFileInfo]> files;
-    property <string> message:"Results";
-    property <string> directory:".";
+    in-out property <[SFileInfo]> files;
+    in-out property <string> message:"Results";
+    in-out property <string> directory:".";
     property <bool> show_options;
-    property <bool> export_enabled:false;
-    property <string>selected_sort:"None";
-    property <bool> error_dir:false;
+    in-out property <bool> export_enabled:false;
+    in-out property <string>selected_sort:"None";
+    in-out property <bool> error_dir:false;
 
     callback sort_changed();
     callback search();
@@ -40,13 +26,13 @@ export MainWindow := Window {
     forward-focus: edit;
 
     //for files
-    property <string> find_text;
-    property <bool>case_sensitive;
-    property <string>selected_ftypes:"All";
+    in-out property <string> find_text;
+    in-out property <bool>case_sensitive;
+    in-out property <string>selected_ftypes:"All";
 
     //for contents
-    property <string> content_find_text;
-    property <bool>content_case_sensitive;
+    in-out property <string> content_find_text;
+    in-out property <bool>content_case_sensitive;
 
     
     preferred-width: 1000px;
@@ -107,7 +93,7 @@ export MainWindow := Window {
                                 color: white;
                                 vertical-alignment: center;
                              }
-                            StandardButton { 
+                            Button { 
                                 text: "🗁";
                                 height: 40px;
                                 width: 60px;
@@ -115,9 +101,13 @@ export MainWindow := Window {
                              }
                             Rectangle {
                                 background: root.error-dir?red:transparent;
-                                height: root.error-dir?42px:40px;
+                                height: 42px;
                                 LineEdit { 
-                                height:40px;
+                                    x:2px;
+                                    y:2px;
+                                    width:parent.width -4px;
+                                height:38px;
+                                
                                 text <=> root.directory;
                                 edited => { root.dir-changed();} 
                                 accepted => { root.search(); }
@@ -128,7 +118,7 @@ export MainWindow := Window {
                         padding: 5px;
                         height:50px;
                    
-                        StandardButton { 
+                        Button { 
                             text: "Find";
                             height: 40px;
                             width: 80px;
@@ -156,7 +146,7 @@ export MainWindow := Window {
                             clicked => { root.show-options=!root.show-options;}
                          }
                          Rectangle { width:10px; }
-                         exp:=StandardButton { 
+                         exp:=Button { 
                              text:"Export";
                              enabled<=>root.export_enabled;
                              clicked => { popup.show(); }
@@ -167,8 +157,8 @@ export MainWindow := Window {
                               x:exp.x - 10px;
                               y:exp.y+exp.height;
                              VerticalLayout {
-                                      StandardButton {  text: "Full paths"; clicked => { export(1); } }
-                                      StandardButton {   text: "Names"; clicked => { export(2); } }
+                                      Button {   text: "Full paths"; clicked => { export(1); } }
+                                      Button {   text: "Names"; clicked => { export(2); } }
                               }
                          }
                         }

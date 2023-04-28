@@ -1,17 +1,17 @@
 [package]
 name = "rusl"
-version = "0.1.9"
+version = "0.2.0"
 edition = "2021"
 build = "build.rs"
 
 [dependencies]
 librusl={path="../librusl"}
-rfd = "0.10.0" #for selecting directory slint = 
-slint = "0.3.1" #GUI
+rfd = "0.11.3" #for selecting directory slint = 
+slint = "1.0.2" #GUI
 
 
 [build-dependencies]
-slint-build = "0.3.1" #slint GUI
+slint-build = "1.0.2" #slint GUI
 
 
 

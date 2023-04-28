@@ -22,7 +22,7 @@ pub fn main() {
         ..Default::default()
     };
 
-    eframe::run_native("rusl", native_options, Box::new(|cc| Box::new(AppState::new(cc))));
+    eframe::run_native("rusl", native_options, Box::new(|cc| Box::new(AppState::new(cc)))).expect("Could not run");
 }
 fn load_icon() -> eframe::IconData {
     let (icon_rgba, icon_width, icon_height) = {
@@ -115,14 +115,14 @@ impl AppState {
 
             ui.label("File Name");
             let sn = ui.text_edit_singleline(&mut self.search_name);
-            if sn.lost_focus() && sn.ctx.input().key_pressed(egui::Key::Enter) {
+            if sn.lost_focus() && sn.ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
                 self.do_search()
             }
 
             ui.label("");
             ui.label("File contents");
             let se = ui.text_edit_singleline(&mut self.search_content);
-            if se.lost_focus() && se.ctx.input().key_pressed(egui::Key::Enter) {
+            if se.lost_focus() && se.ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
                 self.do_search()
             }
 

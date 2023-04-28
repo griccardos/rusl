@@ -1,19 +1,17 @@
 [package]
 name = "rusl"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 build = "build.rs"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 librusl={path="../librusl"}
-rfd = "0.10.0" #for selecting directory for gui
-iced = { git="https://github.com/iced-rs/iced",features = ["debug","tokio"]}#gui
-js-sys = "0.3.59"
-image = "0.24.4"
+rfd = "0.11.3" #for selecting directory for gui
+iced = { version="0.9.0",features = ["debug","tokio"]}#gui
+js-sys = "0.3.61"
+image = "0.24.6"
 
 
 [build-dependencies]
-embed-resource="1.7.2" #for icon
+embed-resource="2.1.1" #for icon
 

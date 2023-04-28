@@ -1,17 +1,16 @@
 [package]
 name = "rusl"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 build = "build.rs"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 librusl={path="../librusl"}
-rfd = "0.10.0" #for selecting directory for gui
-eframe = "0.19.0" #egui
-image = "0.24.2" #for titlebar icon
+rfd = "0.11.3" #for selecting directory for gui
+eframe = "0.21.3" #egui
+image = "0.24.6" #for titlebar icon
 
 [build-dependencies]
-embed-resource="1.7.2" #for icon
+embed-resource="2.1.1" #for icon
 
