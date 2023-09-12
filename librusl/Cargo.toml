@@ -5,12 +5,12 @@ edition = "2021"
 description = "main rusl library"
 
 [dependencies]
-regex = "1.7.1" # for pattern matching
-num_cpus = "1.15.0" # for parallel search
-grep = "0.2.11" #ripgrep
+regex = "1.9.5" # for pattern matching
+num_cpus = "1.16.0" # for parallel search
+grep = "0.2.12" #ripgrep
 ignore = "0.4.20" #parallel walker from ripgrep
-walkdir = "2.3.2" #walker from ripgrep
+walkdir = "2.4.0" #walker from ripgrep
 clipboard = "0.5.0" #for clipboard
-dirs = "4.0.0" #for getting config file
-serde = { version="1.0.156", features=["derive"]}  #save config
-toml = "0.7.3" #config format
+dirs = "5.0.1" #for getting config file
+serde = { version="1.0.188", features=["derive"]}  #save config
+toml = "0.7.8" #config format

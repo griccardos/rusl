@@ -7,10 +7,10 @@ build = "build.rs"
 
 [dependencies]
 librusl={path="../librusl"}
-rfd = "0.11.3" #for selecting directory for gui
-eframe = "0.21.3" #egui
-image = "0.24.6" #for titlebar icon
+rfd = "0.12.0" #for selecting directory for gui
+eframe = "0.22.0" #egui
+image = "0.24.7" #for titlebar icon
 
 [build-dependencies]
-embed-resource="2.1.1" #for icon
+embed-resource="2.3.0" #for icon
 

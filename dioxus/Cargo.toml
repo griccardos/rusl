@@ -8,15 +8,15 @@ build = "build.rs"
 
 [dependencies]
 librusl = {path="../librusl"}
-dioxus = "0.3.1"
-tokio = "1.24.1" #for dioxus
-futures-channel = "0.3.25" #for dioxus
-dioxus-desktop = "0.3.0"
-image = "0.24.5"
+dioxus = "0.4.0"
+tokio = "1.32.0" #for dioxus
+futures-channel = "0.3.28" #for dioxus
+dioxus-desktop = "0.4.0"
+image = "0.24.7"
 
 
 [build-dependencies]
-embed-resource="1.7.2" #for icon
+embed-resource="2.3.0" #for icon
 
 
 
