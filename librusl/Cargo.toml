@@ -1,6 +1,6 @@
 [package]
 name = "librusl"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "main rusl library"
 
@@ -13,4 +13,7 @@ walkdir = "2.4.0" #walker from ripgrep
 clipboard = "0.5.0" #for clipboard
 dirs = "5.0.1" #for getting config file
 serde = { version="1.0.188", features=["derive"]}  #save config
-toml = "0.7.8" #config format
+toml = "0.8.1" #config format
+termcolor = "1.3.0" #unly used for grep to get nocolor
+pdf-extract= "0.7.2" # for pdf
+dotext = "0.1.1" # for office docs

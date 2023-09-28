@@ -8,6 +8,8 @@ Each GUI Can be found in its own folder. To compile, cd into the folder, and car
 
 Druid is currently the most feature complete and releases are Druid.
 
+To enable `pdf/word/excel` searching, tick the `extended` box in settings. Currently this reads entire document to memory, so may not be suitable for large documents. Has a big impact on search time, so disabled by default.
+
 Why the name rusl? Well, it's the sound made when you are searching through leaves or papers for something. Also it's 75% of the letters in rust!
 
 ![image](https://user-images.githubusercontent.com/30464685/197233181-db1760dd-429f-48dc-b73a-6aea8f1c3743.png)
@@ -33,6 +35,9 @@ Why the name rusl? Well, it's the sound made when you are searching through leav
     - [ ] fltk
     - [ ] Relm4
     - [X] Iced
+- [X] extended file formats. Line numbers are an estimation only
+    - [X] Pdf
+    - [X] Office: docx, xlsx, pptx, odp, odt
 
 This project relies heavily on ripgrep and BurntSushi's libraries. 
 > Shout out to BurntSushi for the awesome work (https://github.com/BurntSushi)  
@@ -69,7 +74,7 @@ UI
 |                       |Druid  |Slint  |EGUI   |ICED   |Dioxus |
 |-                      |:-----:|:-----:|:-----:|:-----:|:-----:|
 | - Toolbar icon        |&check;|&check;|&check;|&check;|&check;|
-| - Window icon         |&cross;|&check;|&check;|&check;|&check;| 
+| - Window icon         |&check;|&check;|&check;|&check;|&check;| 
 | - Tab between fields  |&check;|&check;|&check;|&cross;|&check;| 
 | - paste into textbox  |&check;|&check;|&check;|&check;|&check;| 
 

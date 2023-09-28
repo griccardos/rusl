@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Options {
     //general options
@@ -67,6 +66,8 @@ impl Default for NameOptions {
 pub struct ContentOptions {
     #[serde(default)]
     pub case_sensitive: bool,
+    #[serde(default)]
+    pub extended: bool,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Default)]

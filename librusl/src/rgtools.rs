@@ -1,21 +1,25 @@
+use crate::{
+    extended::{ExtendedTrait, ExtendedType},
+    options::ContentOptions,
+};
 use grep::{
-    printer::StandardBuilder,
-    regex::RegexMatcherBuilder,
-    searcher::{BinaryDetection, SearcherBuilder},
+    printer::{Standard, StandardBuilder},
+    regex::{RegexMatcher, RegexMatcherBuilder},
+    searcher::{BinaryDetection, Searcher, SearcherBuilder},
 };
 use std::{
     collections::HashSet,
     ffi::OsString,
     fs::File,
-    io::Write,
+    io::{Cursor, Write},
+    path::Path,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
 };
+use termcolor::NoColor;
 use walkdir::WalkDir;
-
-use crate::options::ContentOptions;
 
 struct MyWrite {
     data: Vec<u8>,
@@ -34,6 +38,7 @@ pub fn search_contents(
     allowed_files: Option<HashSet<String>>,
     ops: ContentOptions,
     must_stop: Arc<AtomicBool>,
+    counter: Arc<AtomicUsize>,
 ) -> ContentResults {
     let case_insensitive = !ops.case_sensitive;
     let mut errors = vec![];
@@ -55,15 +60,15 @@ pub fn search_contents(
 
     if let Some(allowed_files) = allowed_files {
         for path in allowed_files {
-            let file = File::open(&path);
-            if file.is_err() {
-                continue;
-            }
-            let file = file.unwrap();
-            let result = searcher.search_file(&matcher, &file, printer.sink_with_path(&matcher, &path));
-            if let Err(err) = result {
-                errors.push(err.to_string());
-            }
+            read_file(
+                &Path::new(&path),
+                &mut searcher,
+                &matcher,
+                &mut printer,
+                &mut errors,
+                &ops,
+                counter.clone(),
+            );
         }
     } else {
         for path in paths {
@@ -83,16 +88,53 @@ pub fn search_contents(
                 if !dent.file_type().is_file() {
                     continue;
                 }
-                let result = searcher.search_path(&matcher, dent.path(), printer.sink_with_path(&matcher, dent.path()));
-                if let Err(err) = result {
-                    errors.push(err.to_string());
-                }
+                read_file(&dent.path(), &mut searcher, &matcher, &mut printer, &mut errors, &ops, counter.clone());
             }
         }
     }
     ContentResults {
         results: printer.into_inner().into_inner().string().split('\n').map(|x| x.to_string()).collect(),
         errors,
+    }
+}
+fn read_file(
+    path: &Path,
+    searcher: &mut Searcher,
+    matcher: &RegexMatcher,
+    printer: &mut Standard<NoColor<MyWrite>>,
+    errors: &mut Vec<String>,
+    ops: &ContentOptions,
+    counter: Arc<AtomicUsize>,
+) {
+    let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f + 1));
+
+    let file = File::open(path);
+    if let Ok(file) = file {
+        //normal grep
+        let result = searcher.search_file(matcher, &file, printer.sink_with_path(matcher, &path));
+        if let Err(err) = result {
+            errors.push(err.to_string());
+        }
+
+        //apply each of extensions
+        if ops.extended {
+            let extension = path.extension().unwrap_or_default().to_string_lossy().to_string();
+            let extendeds = vec![ExtendedType::Pdf, ExtendedType::Office];
+            for ext in extendeds.iter().filter(|a| a.extensions().contains(&extension)) {
+                if let Ok(data) = ext.to_string(&path) {
+                    let cursor = Cursor::new(data);
+                    let result = searcher.search_reader(
+                        matcher,
+                        cursor,
+                        printer.sink_with_path(matcher, &format!("{} ({})", path.to_string_lossy(), ext.name())),
+                    );
+                    if let Err(err) = result {
+                        errors.push(err.to_string());
+                    }
+                } else {
+                }
+            }
+        }
     }
 }
 impl MyWrite {

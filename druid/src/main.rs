@@ -27,6 +27,7 @@ pub const SEARCH: Selector = Selector::new("search");
 pub const STOP: Selector = Selector::new("stop");
 pub const RESULTS: Selector<SearchResult> = Selector::new("results");
 pub const UPDATEMESSAGE: Selector<String> = Selector::new("message");
+pub const UPDATECOUNT: Selector<String> = Selector::new("count");
 pub const EXPORT: Selector = Selector::new("export");
 pub const EXPORTSINGLE: Selector<String> = Selector::new("exportsingle");
 
@@ -38,6 +39,7 @@ struct AppState {
     text_contents: String,
     dir: String,
     message: RichText,
+    count: String,
     error_message: String,
     showing_errors: bool,
     visible: Vector<RichText>,
@@ -56,6 +58,7 @@ struct AppState {
     name_search_file_type: SearchFileType,
     name_use_gitignore: bool,
     content_case_sensitive: bool,
+    content_extended: bool,
     //regex
     #[data(ignore)]
     re_name: Result<Regex, regex::Error>,
@@ -79,6 +82,7 @@ pub fn main() {
     let (s, r) = mpsc::channel::<SearchResult>();
     let man = Manager::new(s);
     let ops = man.get_options();
+    let counter = man.counter.clone();
 
     let data = AppState {
         text_name: String::new(),
@@ -95,6 +99,7 @@ pub fn main() {
         searching: false,
         interim_count: 0,
         find_name: String::from("Find"),
+        count: String::new(),
         //settings
         name_case_sensitive: ops.name.case_sensitive,
         name_same_filesystem: ops.name.same_filesystem,
@@ -103,6 +108,7 @@ pub fn main() {
         name_use_gitignore: ops.name.use_gitignore,
         name_search_file_type: SearchFileType::All,
         content_case_sensitive: ops.content.case_sensitive,
+        content_extended: ops.content.extended,
         //regex
         re_name: Regex::new(""),
         re_content: Regex::new(""),
@@ -116,8 +122,8 @@ pub fn main() {
 
     let main_window = WindowDesc::new(ui_builder()).title("Rusl").window_size((800.0, 800.0)).resizable(true);
     let app = AppLauncher::with_window(main_window).delegate(delegate).log_to_console();
+    //get messagegs from manager
     let sink = app.get_external_handle();
-
     spawn(move || loop {
         let mess = r.recv();
         if mess.is_err() {
@@ -126,6 +132,14 @@ pub fn main() {
         let mess = mess.unwrap();
 
         sink.submit_command(RESULTS, mess, Target::Auto).expect("Sent results to sink");
+    });
+    //update counter
+    let sink = app.get_external_handle();
+    spawn(move || loop {
+        std::thread::sleep(Duration::from_secs(1));
+        let count = counter.load(std::sync::atomic::Ordering::Relaxed);
+        let str = if count != 0 { format!("searched {}", count) } else { String::new() };
+        let _ = sink.submit_command(UPDATECOUNT, str, Target::Auto);
     });
 
     app.launch(data).expect("Run druid window");
@@ -163,6 +177,7 @@ fn ui_builder() -> impl Widget<AppState> {
         .on_click(|ctx, _data, _env| ctx.submit_command(EXPORT))
         .fix_size(85., 40.);
     let lmessage = RawLabel::new().lens(AppState::message).padding(5.0).center().expand_width();
+    let lcount = RawLabel::new().lens(AppState::count).padding(5.0);
     let berrors = Either::new(
         |data: &AppState, _env| data.error_message.is_empty(),
         Label::new(""),
@@ -222,7 +237,12 @@ fn ui_builder() -> impl Widget<AppState> {
                 .with_spacer(5.),
         )
         .with_child(settings_panel())
-        .with_child(Flex::row().with_flex_child(lmessage, 1.).with_flex_child(berrors, 0.))
+        .with_child(
+            Flex::row()
+                .with_flex_child(lmessage, 1.)
+                .with_flex_child(berrors, 0.5)
+                .with_flex_child(lcount, 0.5),
+        )
         .with_flex_child(list, 1.0)
 }
 fn settings_panel() -> impl Widget<AppState> {
@@ -246,6 +266,7 @@ fn settings_panel() -> impl Widget<AppState> {
             ) // Radio::new("All", true).lens(AppState::type_all)))
             .with_child(Label::new("Content Settings").align_left().padding(10.))
             .with_child(Checkbox::new("Case sensitive").lens(AppState::content_case_sensitive).align_left())
+            .with_child(Checkbox::new("Extended file types").lens(AppState::content_extended).align_left())
             .padding(10.),
         Flex::column(),
     )
@@ -315,6 +336,7 @@ impl AppDelegate<AppState> for Delegate {
             ops.name.follow_links = data.name_follow_links;
             ops.name.same_filesystem = data.name_same_filesystem;
             ops.content.case_sensitive = data.content_case_sensitive;
+            ops.content.extended = data.content_extended;
             ops.name.ignore_dot = data.name_ignore_dot;
             ops.name.use_gitignore = data.name_use_gitignore;
             ops.name.file_types = data.name_search_file_type.clone().into();
@@ -332,6 +354,10 @@ impl AppDelegate<AppState> for Delegate {
 
         if let Some(mess) = cmd.get(UPDATEMESSAGE) {
             data.message = RichText::new(mess.clone().into());
+            return Handled::Yes;
+        }
+        if let Some(mess) = cmd.get(UPDATECOUNT) {
+            data.count = mess.clone();
             return Handled::Yes;
         }
 

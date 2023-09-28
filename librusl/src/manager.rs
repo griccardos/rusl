@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -42,6 +42,7 @@ pub struct Manager {
     id: usize,
     options: Arc<Mutex<Options>>,
     pub must_stop: Arc<AtomicBool>,
+    pub counter: Arc<AtomicUsize>,
 }
 
 impl Manager {
@@ -60,16 +61,22 @@ impl Manager {
             id: 0,
             options: ops,
             must_stop: Arc::new(AtomicBool::new(false)),
+            counter: Arc::new(AtomicUsize::new(0)),
         }
     }
     pub fn stop(&mut self) {
         self.must_stop.store(true, std::sync::atomic::Ordering::Relaxed);
     }
+    pub fn get_count(&self) -> usize {
+        self.counter.load(Ordering::Relaxed)
+    }
 
     pub fn search(&mut self, search: Search) {
+        //start with must stop=TRUE in case old one is running
+        self.must_stop.store(false, Ordering::Relaxed);
         let mut ops = self.options.lock().unwrap();
         self.id += 1;
-        self.must_stop.store(false, std::sync::atomic::Ordering::Relaxed);
+        self.counter.store(0, Ordering::Relaxed);
         ops.last_dir = search.dir.clone();
         if !search.name_text.is_empty() && !ops.name_history.contains(&search.name_text) {
             ops.name_history.push(search.name_text.clone());
@@ -78,6 +85,8 @@ impl Manager {
             ops.content_history.push(search.contents_text.clone());
         }
         drop(ops);
+
+        self.must_stop.store(false, Ordering::Relaxed);
         self.spawn_search(search);
     }
 
@@ -125,8 +134,13 @@ impl Manager {
             eprintln!("Error sending {err}");
         }
 
+        //change must stop to false, and reset counter
+        self.counter.store(0, Ordering::Relaxed);
+        self.must_stop.store(false, Ordering::Relaxed);
+
         //do name search
         let must_stop1 = self.must_stop.clone();
+        let counter1 = self.counter.clone();
         let search1 = search.clone();
         let file_sender1 = file_sender.clone();
         let options1 = self.options.lock().unwrap().clone();
@@ -134,7 +148,7 @@ impl Manager {
         if !search.name_text.is_empty() {
             thread::spawn(move || {
                 let start = Instant::now();
-                Manager::find_names(&search1, options1, message_number, file_sender1.clone(), must_stop1);
+                Manager::find_names(&search1, options1, message_number, file_sender1.clone(), must_stop1, counter1);
                 if let Err(err) = file_sender1.send(Message::Done(message_number, start.elapsed())) {
                     eprintln!("Manager: Could not send result {message_number} {err:?}");
                 }
@@ -143,11 +157,12 @@ impl Manager {
 
         //do content search (only if name is empty, otherwise it will be spawned after)
         let must_stop2 = self.must_stop.clone();
+        let counter2 = self.counter.clone();
         let options2 = self.options.lock().unwrap().clone();
         if !search.contents_text.is_empty() && search.name_text.is_empty() {
             thread::spawn(move || {
                 let start = Instant::now();
-                let files = Manager::find_contents(&search.contents_text, &search.dir, None, options2, must_stop2);
+                let files = Manager::find_contents(&search.contents_text, &search.dir, None, options2, must_stop2, counter2);
                 file_sender
                     .send(Message::ContentFiles(files.results, message_number, start.elapsed()))
                     .unwrap();
@@ -157,7 +172,7 @@ impl Manager {
         }
     }
 
-    fn find_names(search: &Search, options: Options, id: usize, file_sender: Sender<Message>, must_stop: Arc<AtomicBool>) {
+    fn find_names(search: &Search, options: Options, id: usize, file_sender: Sender<Message>, must_stop: Arc<AtomicBool>, counter: Arc<AtomicUsize>) {
         let text = &search.name_text;
         let dir = &search.dir;
         let ftype = options.name.file_types;
@@ -184,6 +199,7 @@ impl Manager {
 
             let options = options.clone();
             let must_stop = must_stop.clone();
+            let counter = counter.clone();
             Box::new(move |result| {
                 if must_stop.load(Ordering::Relaxed) {
                     return ignore::WalkState::Quit;
@@ -233,6 +249,7 @@ impl Manager {
                                 Some(HashSet::from_iter([dent.path().to_string_lossy().to_string()])),
                                 options.clone(),
                                 must_stop.clone(),
+                                counter.clone(),
                             );
                             if cont.results.is_empty() {
                                 must_add = false;
@@ -279,8 +296,16 @@ impl Manager {
         allowed_files: Option<HashSet<String>>,
         options: Options,
         must_stop: Arc<AtomicBool>,
+        counter: Arc<AtomicUsize>,
     ) -> ContentFileInfoResults {
-        let content_results = rgtools::search_contents(text, &[OsString::from_str(dir).unwrap()], allowed_files, options.content, must_stop);
+        let content_results = rgtools::search_contents(
+            text,
+            &[OsString::from_str(dir).unwrap()],
+            allowed_files,
+            options.content,
+            must_stop,
+            counter,
+        );
         let strings = content_results.results;
         let errors = content_results.errors;
 
