@@ -118,7 +118,7 @@ fn read_file(
 
         //apply each of extensions
         if ops.extended {
-            let extension = path.extension().unwrap_or_default().to_string_lossy().to_string();
+            let extension = path.extension().unwrap_or_default().to_string_lossy().to_lowercase();
             let extendeds = vec![ExtendedType::Pdf, ExtendedType::Office];
             for ext in extendeds.iter().filter(|a| a.extensions().contains(&extension)) {
                 if let Ok(data) = ext.to_string(&path) {

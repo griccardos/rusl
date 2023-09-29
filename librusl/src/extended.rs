@@ -7,6 +7,7 @@ use std::panic::catch_unwind;
 use std::path::Path;
 pub trait ExtendedTrait {
     fn name(&self) -> String;
+    ///lowercase extensions
     fn extensions(&self) -> Vec<String>;
     fn to_string(&self, path: &Path) -> Result<String, Box<dyn std::error::Error>>;
 }
