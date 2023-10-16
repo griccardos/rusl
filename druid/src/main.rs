@@ -270,7 +270,7 @@ fn settings_panel() -> impl Widget<AppState> {
             .with_child(Label::new("Content Settings").align_left().padding(10.))
             .with_child(Checkbox::new("Case sensitive").lens(AppState::content_case_sensitive).align_left())
             .with_child(Checkbox::new("Extended file types").lens(AppState::content_extended).align_left())
-            .with_child(Checkbox::new("Text match (non regex)").lens(AppState::content_nonregex).align_left())
+            .with_child(Checkbox::new("Literal match (non regex)").lens(AppState::content_nonregex).align_left())
             .padding(10.),
         Flex::column(),
     )
