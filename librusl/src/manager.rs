@@ -11,9 +11,10 @@ use std::time::{Duration, Instant};
 use clipboard::{ClipboardContext, ClipboardProvider};
 use ignore::WalkBuilder;
 
+use crate::extended::ExtendedType;
 use crate::fileinfo::{FileInfo, Match};
 use crate::options::{FTypes, Options, Sort};
-use crate::rgtools::{self, SEPARATOR};
+use crate::rgtools::{self, EXTENSION_SEPARATOR, SEPARATOR};
 use crate::search::Search;
 
 pub enum Message {
@@ -276,6 +277,7 @@ impl Manager {
                                     .into(),
                                 matches,
                                 is_folder: dent.file_type().unwrap().is_dir(),
+                                plugin: None,
                             },
                             id,
                         ));
@@ -314,30 +316,27 @@ impl Manager {
             .map(|x| x.split(&SEPARATOR).collect::<Vec<&str>>())
             .filter(|x| x.len() == 3)
             .collect();
-        let mut hm: HashMap<&str, FileInfo> = HashMap::new();
+        let mut hm: HashMap<String, FileInfo> = HashMap::new();
         for f in file_line_content.iter() {
-            if !hm.contains_key(f[0]) {
-                let pb = PathBuf::from(f[0]);
-                hm.insert(
-                    f[0],
-                    FileInfo {
-                        path: f[0].into(),
-                        matches: vec![],
-                        ext: pb.extension().unwrap_or(&OsString::from("")).to_str().unwrap_or_default().into(),
-                        name: PathBuf::from(f[0]).file_name().unwrap_or_default().to_str().unwrap_or_default().into(),
-                        is_folder: pb.is_dir(),
-                    },
-                );
-            }
+            let (path, extended): (String, Option<ExtendedType>) = match f[0].split_once(EXTENSION_SEPARATOR) {
+                Some((a, b)) => (a.to_string(), Some(b.into())),
+                None => (f[0].to_string(), None),
+            };
+            let pb = PathBuf::from(&path);
 
-            hm.entry(f[0]).and_modify(|e| {
-                e.matches.push(Match {
-                    line: f[1].parse().unwrap_or(0),
-                    content: f[2].to_owned(),
-                })
+            let entry = hm.entry(path.clone()).or_insert(FileInfo {
+                path: path.clone(),
+                matches: vec![],
+                ext: pb.extension().unwrap_or(&OsString::from("")).to_str().unwrap_or_default().into(),
+                name: PathBuf::from(f[0]).file_name().unwrap_or_default().to_str().unwrap_or_default().into(),
+                is_folder: pb.is_dir(),
+                plugin: extended,
+            });
+            entry.matches.push(Match {
+                line: f[1].parse().unwrap_or(0),
+                content: f[2].to_owned(),
             });
         }
-
         ContentFileInfoResults {
             results: hm.into_values().collect(),
             errors,

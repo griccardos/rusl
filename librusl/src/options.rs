@@ -68,6 +68,8 @@ pub struct ContentOptions {
     pub case_sensitive: bool,
     #[serde(default)]
     pub extended: bool,
+    #[serde(default)]
+    pub nonregex: bool, //--fixed-string
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Default)]

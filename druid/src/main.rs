@@ -17,6 +17,7 @@ use druid::{
 use regex::{Regex, RegexBuilder};
 
 use librusl::{
+    extended::ExtendedTrait,
     fileinfo::FileInfo,
     manager::{FinalResults, Manager, SearchResult},
     options::FTypes,
@@ -59,6 +60,7 @@ struct AppState {
     name_use_gitignore: bool,
     content_case_sensitive: bool,
     content_extended: bool,
+    content_nonregex: bool,
     //regex
     #[data(ignore)]
     re_name: Result<Regex, regex::Error>,
@@ -109,6 +111,7 @@ pub fn main() {
         name_search_file_type: SearchFileType::All,
         content_case_sensitive: ops.content.case_sensitive,
         content_extended: ops.content.extended,
+        content_nonregex: ops.content.nonregex,
         //regex
         re_name: Regex::new(""),
         re_content: Regex::new(""),
@@ -267,6 +270,7 @@ fn settings_panel() -> impl Widget<AppState> {
             .with_child(Label::new("Content Settings").align_left().padding(10.))
             .with_child(Checkbox::new("Case sensitive").lens(AppState::content_case_sensitive).align_left())
             .with_child(Checkbox::new("Extended file types").lens(AppState::content_extended).align_left())
+            .with_child(Checkbox::new("Text match (non regex)").lens(AppState::content_nonregex).align_left())
             .padding(10.),
         Flex::column(),
     )
@@ -337,6 +341,7 @@ impl AppDelegate<AppState> for Delegate {
             ops.name.same_filesystem = data.name_same_filesystem;
             ops.content.case_sensitive = data.content_case_sensitive;
             ops.content.extended = data.content_extended;
+            ops.content.nonregex = data.content_nonregex;
             ops.name.ignore_dot = data.name_ignore_dot;
             ops.name.use_gitignore = data.name_use_gitignore;
             ops.name.file_types = data.name_search_file_type.clone().into();
@@ -405,6 +410,10 @@ impl AppDelegate<AppState> for Delegate {
                     }
                     if filecount > 0 && foldercount > 0 {
                         string += &format!(" {} total", filecount + foldercount);
+                    }
+                    let line_count = results.data.iter().map(|x| x.matches.len()).sum::<usize>();
+                    if line_count > 0 {
+                        string += &format!(" with {} lines", line_count);
                     }
 
                     string += &format!(" in {:.3}s", data.start.elapsed().as_secs_f64());
@@ -544,6 +553,12 @@ fn highlight_result(
     }
     full.push(' ');
     full.push_str(&x.path);
+    let plugin = if let Some(plug) = x.plugin {
+        format!(" ({})", plug.name())
+    } else {
+        String::new()
+    };
+    full.push_str(&plugin);
     let mut rich = if !x.matches.is_empty() {
         let start = full.len();
         full.push('\n');
@@ -582,8 +597,8 @@ fn highlight_result(
                 if let Some(mat) = cap.get(0) {
                     let mut range = mat.range();
                     if range.end <= content.len() {
-                        range.start += x.path.len() + symlen + 2;
-                        range.end += x.path.len() + symlen + 2;
+                        range.start += x.path.len() + plugin.len() + symlen + 2;
+                        range.end += x.path.len() + plugin.len() + symlen + 2;
                         if full.is_char_boundary(range.start) && full.is_char_boundary(range.end) {
                             rich.add_attribute(range.clone(), Attribute::Weight(FontWeight::BOLD));
                             rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(189, 60, 71)));
@@ -594,6 +609,13 @@ fn highlight_result(
                 }
             }
         }
+        //highlight plugin
+        if !plugin.is_empty() {
+            rich.add_attribute(
+                x.path.len() + symlen + 1..x.path.len() + symlen + 1 + plugin.len(),
+                Attribute::text_color(Color::rgb8(18, 110, 171)),
+            );
+        }
 
         //highlight line number
         if let Ok(re) = &re_numbers {
@@ -601,8 +623,8 @@ fn highlight_result(
                 if let Some(mat) = cap.get(0) {
                     let mut range = mat.range();
                     if range.end <= content.len() {
-                        range.start += x.path.len() + symlen + 2;
-                        range.end += x.path.len() + symlen + 2;
+                        range.start += x.path.len() + plugin.len() + symlen + 2;
+                        range.end += x.path.len() + plugin.len() + symlen + 2;
                         rich.add_attribute(range.clone(), Attribute::Weight(FontWeight::BOLD));
                         rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(17, 122, 13)));
                     } else {

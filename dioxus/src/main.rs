@@ -69,6 +69,7 @@ fn app(cx: Scope<()>) -> Element {
                                         ext: "".to_string(),
                                         name: "".to_string(),
                                         is_folder: false,
+                                        plugin: None,
                                     });
                                 };
                                 message.set(format!("Found {} in {:.2}s", found_count, fe.duration.as_secs_f32()));
@@ -91,6 +92,7 @@ fn app(cx: Scope<()>) -> Element {
                                         ext: "".to_string(),
                                         name: "".to_string(),
                                         is_folder: false,
+                                        plugin: None,
                                     });
                                 }
                             }
@@ -108,80 +110,72 @@ fn app(cx: Scope<()>) -> Element {
 
     cx.render(rsx!(
 
-            div{
+        div {
 
+            //toolbar
+            div { style: "background-color:#404040;padding:10px;",
+                div { class: "mui-textfield",
 
-                //toolbar
-                div{
-                    style:"background-color:#404040;padding:10px;",
-                div{
-                    class:"mui-textfield",
-
-                    input{
-                        style:"color:lightgray;",
-                    value:"{text_name}",
-                    placeholder:"Regex file name search e.g. ^mai.*rs$ or r.st or ^best",
-                    oninput: move|evt|{ let newval=evt.value.clone(); text_name.set(newval);},
+                    input {
+                        style: "color:lightgray;",
+                        value: "{text_name}",
+                        placeholder: "Regex file name search e.g. ^mai.*rs$ or r.st or ^best",
+                        oninput: move |evt| {
+                            let newval = evt.value.clone();
+                            text_name.set(newval);
+                        }
+                    }
+                    label { style: "color:white", "File name" }
                 }
-                label{
-                    style:"color:white",
-                    "File name"
+                div { class: "mui-textfield",
+                    input {
+                        style: "color:lightgray;",
+                        value: "{text_contents}",
+                        placeholder: "Regex content search e.g. str.{2}g",
+                        oninput: move |evt| {
+                            let newval = evt.value.clone();
+                            text_contents.set(newval);
+                        }
+                    }
+                    label { style: "color:white", "Contents" }
+                }
+                div { class: "mui-textfield",
+                    input {
+                        style: "color:lightgray;",
+                        value: "{text_dir}",
+                        oninput: move |evt| {
+                            let newval = evt.value.clone();
+                            text_dir.set(newval);
+                        }
+                    }
+                    label { style: "color:white", "Directory" }
+                }
+                div { "{message}" }
+                div {
+                    button {
+                        class: "mui-btn mui-btn--primary mui-btn--raised",
+                        onclick: move |_| {
+                            if text_name.is_empty() {
+                                message.set("Nothing to search for".to_string());
+                            } else {
+                                message.set("Searching".to_string());
+                                man.with_mut(|x| {
+                                    x.search(Search {
+                                        name_text: text_name.to_string(),
+                                        contents_text: text_contents.to_string(),
+                                        dir: text_dir.to_string(),
+                                        ..Default::default()
+                                    })
+                                });
+                            }
+                        },
+                        "Find"
+                    }
                 }
             }
-            div{
-                class:"mui-textfield",
-                input{
-                    style:"color:lightgray;",
-                value:"{text_contents}",
-                placeholder:"Regex content search e.g. str.{2}g",
-                oninput: move|evt|{ let newval=evt.value.clone(); text_contents.set(newval);},
-            }
-            label{
-                style:"color:white",
-                "Contents"
-            }
-        }
-            div{
-                class:"mui-textfield",
-                input{
-                    style:"color:lightgray;",
-                    value:"{text_dir}",
-                    oninput: move|evt|{ let newval=evt.value.clone(); text_dir.set(newval);},
-                },
-                label{
-                    style:"color:white",
-                    "Directory"
-                }
-            }
-            div{
-                "{message}",
-            }
-            div{
-            button{
-                class:"mui-btn mui-btn--primary mui-btn--raised",
-                onclick:move|_|{
-                    if text_name.is_empty(){
-                        message.set("Nothing to search for".to_string());
-                    }else{
-                message.set("Searching".to_string());
-                man.with_mut(|x|x.search(Search {
-                    name_text: text_name.to_string(),
-                    contents_text:text_contents.to_string(),
-                    dir: text_dir.to_string(),
-                    ..Default::default()
-                }));
-            }
 
-
-                },
-                "Find"
-            }
-            }
-        }
-
-        //results
-            div{
-                style:"padding:10px",
+            //results
+            div { style: "padding:10px",
                 data.current().borrow().iter().map(|x|
                     {
                         rsx!(
@@ -208,11 +202,8 @@ fn app(cx: Scope<()>) -> Element {
 
             }
             )
-
-
             }
-
-    }
+        }
     ))
 }
 

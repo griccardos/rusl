@@ -1,13 +1,13 @@
 [package]
 name = "librusl"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "main rusl library"
 
 [dependencies]
-regex = "1.9.5" # for pattern matching
+regex =  "1.10.1" # for pattern matching
 num_cpus = "1.16.0" # for parallel search
-grep = "0.2.12" #ripgrep
+grep =  "0.2.12" #ripgrep
 ignore = "0.4.20" #parallel walker from ripgrep
 walkdir = "2.4.0" #walker from ripgrep
 clipboard = "0.5.0" #for clipboard

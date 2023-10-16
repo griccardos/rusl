@@ -47,6 +47,15 @@ impl ExtendedTrait for ExtendedType {
         .to_string()
     }
 }
+impl From<&str> for ExtendedType {
+    fn from(value: &str) -> Self {
+        match value.to_lowercase().as_str() {
+            "pdf" => ExtendedType::Pdf,
+            "office" => ExtendedType::Office,
+            _ => panic!("unknown extended type"),
+        }
+    }
+}
 
 fn extract_pdf(path: &Path) -> Result<String, Box<dyn Error>> {
     let path = path.to_owned();

@@ -168,6 +168,7 @@ impl Application for App {
                                     ext: "".into(),
                                     name: "".into(),
                                     is_folder: false,
+                                    plugin: None,
                                 });
                             }
                         }

@@ -26,6 +26,7 @@ struct MyWrite {
 }
 
 pub const SEPARATOR: &str = r"\0\1\2\3\4";
+pub const EXTENSION_SEPARATOR: &str = r"\5\6\7\8";
 
 #[derive(Default)]
 pub struct ContentResults {
@@ -42,7 +43,16 @@ pub fn search_contents(
 ) -> ContentResults {
     let case_insensitive = !ops.case_sensitive;
     let mut errors = vec![];
-    let matcher = RegexMatcherBuilder::new().case_insensitive(case_insensitive).build(pattern);
+    //TODO: there is a fixed_strings in RegexMatcherBuilder, but it is not updated on
+    //crates.io yet, so we manually escape
+    let mut pattern = pattern.to_string();
+    if ops.nonregex {
+        pattern = regex::escape(&pattern);
+    }
+    ////
+
+    let matcher = RegexMatcherBuilder::new().case_insensitive(case_insensitive).build(&pattern);
+
     if matcher.is_err() {
         return ContentResults::default();
     }
@@ -126,7 +136,7 @@ fn read_file(
                     let result = searcher.search_reader(
                         matcher,
                         cursor,
-                        printer.sink_with_path(matcher, &format!("{} ({})", path.to_string_lossy(), ext.name())),
+                        printer.sink_with_path(matcher, &format!("{}{}{}", path.to_string_lossy(), EXTENSION_SEPARATOR, ext.name())),
                     );
                     if let Err(err) = result {
                         errors.push(err.to_string());

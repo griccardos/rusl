@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use crate::extended::ExtendedType;
+
 #[derive(Clone, Debug)]
 pub struct FileInfo {
     pub path: String,
@@ -7,6 +9,7 @@ pub struct FileInfo {
     pub ext: String,
     pub name: String,
     pub is_folder: bool,
+    pub plugin: Option<ExtendedType>,
 }
 
 impl FileInfo {
