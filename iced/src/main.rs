@@ -7,8 +7,17 @@ use std::{
 };
 
 use iced::{
-    executor, widget::scrollable, widget::Button, widget::Column, widget::Row, widget::Space, widget::Text, widget::TextInput, window::icon,
-    Application, Color, Command, Element, Length, Settings, Theme,
+    event, executor,
+    keyboard::Event,
+    widget::scrollable,
+    widget::Button,
+    widget::Column,
+    widget::{self, Text},
+    widget::{mouse_area, Space},
+    widget::{tooltip, Row},
+    widget::{Container, TextInput},
+    window::icon,
+    Application, Color, Command, Element, Length, Settings, Subscription, Theme,
 };
 
 use librusl::{
@@ -25,6 +34,7 @@ struct App {
     manager: Manager,
     receiver: Receiver<SearchResult>,
     message: String,
+    found: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -35,18 +45,24 @@ pub enum Message {
     DirectoryChanged(String),
     OpenDirectory,
     CheckExternal,
+    Event(iced::event::Event),
+    CopyToClipboard(Vec<String>),
 }
 
 pub fn main() {
-    let mut sets = Settings::default();
-    sets.default_text_size = 20.;
-    sets.antialiasing = true;
+    let mut sets = Settings::<()> {
+        default_text_size: iced::Pixels::from(18.),
+        antialiasing: true,
+        ..Default::default()
+    };
+
     let image = image::load_from_memory_with_format(include_bytes!("icons/icon.png"), image::ImageFormat::Png)
         .unwrap()
         .into_rgba8();
     let (wid, hei) = image.dimensions();
     let icon = image.into_raw();
     sets.window.icon = Some(icon::from_rgba(icon, wid, hei).unwrap());
+
     App::run(sets).unwrap();
 }
 
@@ -58,16 +74,19 @@ impl Application for App {
 
     fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
         let (s, r) = channel();
+        let man = Manager::new(s);
+
         let d = Self {
             name: "".to_string(),
             contents: "".to_string(),
             message: "".to_string(),
-            directory: ".".to_string(),
+            directory: man.get_options().last_dir.clone(),
             results: vec![],
-            manager: Manager::new(s),
+            manager: man,
             receiver: r,
+            found: 0,
         };
-        (d, Command::none())
+        (d, widget::focus_next())
     }
 
     fn title(&self) -> String {
@@ -75,10 +94,21 @@ impl Application for App {
     }
 
     fn view(&self) -> Element<Self::Message> {
-        let name = TextInput::new("Find file name", &self.name).padding(4).on_input(Message::NameChanged);
+        let name = TextInput::new("Find file name", &self.name)
+            .padding(4)
+            .on_input(Message::NameChanged)
+            .on_submit(Message::FindPressed);
         let contents = TextInput::new("Find contents", &self.contents)
             .on_input(Message::ContentsChanged)
-            .padding(4);
+            .padding(4)
+            .on_submit(Message::FindPressed);
+        let clipboard = if self.results.is_empty() {
+            Container::new(Text::new(""))
+        } else {
+            Container::new(
+                Button::new(Text::new("Clipboard")).on_press(Message::CopyToClipboard(self.results.iter().map(|x| x.path.clone()).collect())),
+            )
+        };
         let dir = TextInput::new("", &self.directory).on_input(Message::DirectoryChanged).padding(4);
         let res = Column::with_children(
             self.results
@@ -90,14 +120,19 @@ impl Application for App {
                     if x.matches.len() > max {
                         content.push_str(&format!("\nand {} other lines", x.matches.len() - max));
                     }
-                    Row::new()
-                        .spacing(10)
-                        .push(
-                            Column::new()
-                                .push(Text::new(&x.path).style(Color::from_rgb8(100, 200, 100)))
-                                .push(Text::new(content).width(Length::Fill)),
-                        )
-                        .into()
+                    let file = tooltip::Tooltip::new(
+                        mouse_area(Text::new(&x.path).style(Color::from_rgb8(100, 200, 100)))
+                            .on_press(Message::CopyToClipboard(vec![x.path.clone()])),
+                        "Click to copy path to clipboard",
+                        tooltip::Position::Right,
+                    );
+
+                    let mut col = Column::new().push(file);
+                    if !content.is_empty() {
+                        let details = Text::new(content).width(Length::Fill);
+                        col = col.push(details);
+                    }
+                    Row::new().spacing(10).push(col).into()
                 })
                 .collect(),
         );
@@ -113,7 +148,7 @@ impl Application for App {
             )
             .push(
                 Row::new()
-                    .push(Text::new("File contents").width(Length::Fixed(100.)))
+                    .push(Text::new("Contents").width(Length::Fixed(100.)))
                     .push(Space::new(iced::Length::Fixed(10.), iced::Length::Shrink))
                     .push(contents),
             )
@@ -129,7 +164,8 @@ impl Application for App {
                     .spacing(15)
                     .align_items(iced::Alignment::End)
                     .push(Button::new(Text::new("Find")).on_press(Message::FindPressed))
-                    .push(Text::new(&self.message)),
+                    .push(Text::new(&self.message))
+                    .push(clipboard),
             )
             .push(res)
             .into()
@@ -138,6 +174,7 @@ impl Application for App {
         match message {
             Message::FindPressed => {
                 self.results.clear();
+                self.found = 0;
                 self.message = "Searching...".to_string();
                 self.manager.search(Search {
                     dir: self.directory.clone(),
@@ -156,7 +193,7 @@ impl Application for App {
                 }
             }
             Message::CheckExternal => {
-                if let Ok(res) = self.receiver.try_recv() {
+                while let Ok(res) = self.receiver.try_recv() {
                     match res {
                         SearchResult::FinalResults(res) => {
                             self.message = format!("Found {} items in {:.2}s", res.data.len(), res.duration.as_secs_f64());
@@ -176,8 +213,10 @@ impl Application for App {
                             if self.results.len() < 1000 {
                                 self.results.push(res)
                             }
+                            self.found += 1;
+                            self.message = format!("Found {}, searching...", self.found);
                         }
-                        SearchResult::SearchErrors(_) => { /*todo show errors*/ }
+                        SearchResult::SearchErrors(_) => {}
                     }
                 }
             }
@@ -186,6 +225,25 @@ impl Application for App {
                     self.directory = path.to_string_lossy().to_string()
                 }
             }
+            Message::Event(iced::Event::Keyboard(Event::KeyPressed {
+                key_code: iced::keyboard::KeyCode::Tab,
+                modifiers,
+            })) => {
+                return if modifiers.shift() {
+                    widget::focus_previous()
+                } else {
+                    widget::focus_next()
+                };
+            }
+            Message::Event(iced::Event::Window(iced::window::Event::CloseRequested)) => {
+                self.manager.save_and_quit();
+            }
+
+            Message::Event(_) => {}
+            Message::CopyToClipboard(str) => {
+                self.manager.export(str);
+                self.message = "Copied to clipboard".to_string();
+            }
         }
         Command::none()
     }
@@ -193,9 +251,13 @@ impl Application for App {
         Theme::Dark
     }
     fn subscription(&self) -> iced::Subscription<Self::Message> {
-        //keep looking for external messages.
-        //this is a hack and polls receiver.
-        //TODO: notify gui only if necessary (once results received) - dont know if possible with ICED
-        iced::time::every(Duration::from_millis(10)).map(|_| Message::CheckExternal)
+        Subscription::batch(vec![
+            //keep looking for external messages.
+            //this is a hack and polls receiver.
+            //TODO: notify gui only if necessary (once results received) - dont know if possible with ICED
+            iced::time::every(Duration::from_millis(10)).map(|_| Message::CheckExternal),
+            //keyboard events
+            event::listen().map(Message::Event),
+        ])
     }
 }

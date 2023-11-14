@@ -75,7 +75,7 @@ UI
 |-                      |:-----:|:-----:|:-----:|:-----:|:-----:|
 | - Toolbar icon        |&check;|&check;|&check;|&check;|&check;|
 | - Window icon         |&check;|&check;|&check;|&check;|&check;| 
-| - Tab between fields  |&check;|&check;|&check;|&cross;|&check;| 
+| - Tab between fields  |&check;|&check;|&check;|&check;(manual impl)|&check;| 
 | - paste into textbox  |&check;|&check;|&check;|&check;|&check;| 
 
 Functionality Implemented 
@@ -85,7 +85,7 @@ Functionality Implemented
 | - Filename search     |&check;|&check;|&check;  |&check;|&check;|
 | - Content search      |&check;|&check;|&check;  |&check;|&check;| 
 | - Match Highlighting  |&check;|&cross;|&cross;  |&cross;|&cross;| 
-| - Settings            |&check;|&check;|&check;  |&cross;|&cross;| 
+| - Settings            |&check;|&check;|&check;  |&check;|&cross;| 
 | - Copy to clipboard   |&check;|&check;|&check;  |&cross;|&cross;| 
 | - Windows             |&check;|&check;|&check;  |&check;|&check;| 
 | - Linux               |&check;|&check;|&check;  |&check;|| 

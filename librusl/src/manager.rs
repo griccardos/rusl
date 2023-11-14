@@ -392,7 +392,8 @@ fn message_receiver(internal_receiver: Receiver<Message>, external_sender: Sende
                 }
                 //send to output
                 final_names.push(file.clone());
-                external_sender.send(SearchResult::InterimResult(file)).unwrap();
+                //quietly ignore if no receiver because probably closed
+                let _ = external_sender.send(SearchResult::InterimResult(file));
             }
             Message::Done(number, elapsed) => {
                 if number != latest_number {

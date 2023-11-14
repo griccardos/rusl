@@ -10,3 +10,4 @@ Currently, we cannot change gui immediately when results are ready, so we use a 
 
 TODO:
 - [ ] remove poll, and update once change. (We need to create a subscriber)
+- [ ] add syntax match highlighting
