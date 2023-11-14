@@ -328,9 +328,11 @@ impl AppDelegate<AppState> for Delegate {
             data.interim_count = 0;
 
             data.re_name = RegexBuilder::new(&data.text_name).case_insensitive(!data.name_case_sensitive).build();
-            data.re_content = RegexBuilder::new(&data.text_contents)
-                .case_insensitive(!data.content_case_sensitive)
-                .build();
+            let mut pattern = data.text_contents.to_string();
+            if data.content_nonregex {
+                pattern = regex::escape(&pattern);
+            }
+            data.re_content = RegexBuilder::new(&pattern).case_insensitive(!data.content_case_sensitive).build();
 
             data.message = rich("Searching...", Color::YELLOW);
             data.error_message = String::new();
