@@ -16,6 +16,8 @@ export component MainWindow inherits Window {
     in-out property <bool> export_enabled:false;
     in-out property <string>selected_sort:"None";
     in-out property <bool> error_dir:false;
+    in-out property <bool> searching;
+    in-out property <string> find_button:"Find";
 
     callback sort_changed();
     callback search();
@@ -119,7 +121,7 @@ export component MainWindow inherits Window {
                         height:50px;
                    
                         Button { 
-                            text: "Find";
+                            text: root.find-button;
                             height: 40px;
                             width: 80px;
                             clicked => { search();  }

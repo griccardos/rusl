@@ -28,12 +28,10 @@ pub const SEARCH: Selector = Selector::new("search");
 pub const STOP: Selector = Selector::new("stop");
 pub const RESULTS: Selector<SearchResult> = Selector::new("results");
 pub const UPDATEMESSAGE: Selector<String> = Selector::new("message");
-pub const UPDATECOUNT: Selector<String> = Selector::new("count");
 pub const EXPORT: Selector = Selector::new("export");
 pub const EXPORTSINGLE: Selector<String> = Selector::new("exportsingle");
 
 const MAX_NAMES: usize = 1000;
-const MAX_CONTENT: usize = 10000;
 #[derive(Data, Clone, Lens)]
 struct AppState {
     text_name: String,
@@ -44,10 +42,11 @@ struct AppState {
     error_message: String,
     showing_errors: bool,
     visible: Vector<RichText>,
-    errors: Vector<String>,
+    visible_errors: Vector<RichText>,
     find_name: String,
     searching: bool,
     data: Vector<String>,
+    done: bool,
 
     start: Instant,
     show_settings: bool,
@@ -74,6 +73,8 @@ struct AppState {
     last_update: Instant,
     #[data(ignore)]
     interim_count: usize,
+    #[data(ignore)]
+    searched_count: usize,
 
     //results
     #[data(ignore)]
@@ -84,7 +85,11 @@ pub fn main() {
     let (s, r) = mpsc::channel::<SearchResult>();
     let man = Manager::new(s);
     let ops = man.get_options();
-    let counter = man.counter.clone();
+
+    //regex constants
+    let rename = Regex::new("");
+    let recontent = Regex::new("");
+    let reline = Regex::new(r"(^|\n)(\d+:)");
 
     let data = AppState {
         text_name: String::new(),
@@ -94,12 +99,15 @@ pub fn main() {
         error_message: String::new(),
         showing_errors: false,
         data: Vector::new(),
-        errors: Vector::new(),
         visible: Vector::new(),
+        visible_errors: Vector::new(),
         start: Instant::now(),
         show_settings: false,
         searching: false,
         interim_count: 0,
+        searched_count: 0,
+        done: true,
+
         find_name: String::from("Find"),
         count: String::new(),
         //settings
@@ -113,9 +121,9 @@ pub fn main() {
         content_extended: ops.content.extended,
         content_nonregex: ops.content.nonregex,
         //regex
-        re_name: Regex::new(""),
-        re_content: Regex::new(""),
-        re_line: Regex::new(r"(^|\n)(\d+:)"),
+        re_name: rename,
+        re_content: recontent,
+        re_line: reline,
         //update
         last_update: Instant::now(),
 
@@ -133,16 +141,7 @@ pub fn main() {
             break;
         }
         let mess = mess.unwrap();
-
         sink.submit_command(RESULTS, mess, Target::Auto).expect("Sent results to sink");
-    });
-    //update counter
-    let sink = app.get_external_handle();
-    spawn(move || loop {
-        std::thread::sleep(Duration::from_secs(1));
-        let count = counter.load(std::sync::atomic::Ordering::Relaxed);
-        let str = if count != 0 { format!("searched {}", count) } else { String::new() };
-        let _ = sink.submit_command(UPDATECOUNT, str, Target::Auto);
     });
 
     app.launch(data).expect("Run druid window");
@@ -187,11 +186,6 @@ fn ui_builder() -> impl Widget<AppState> {
         Button::dynamic(|state: &AppState, _env| state.error_message.clone())
             .fix_height(40.)
             .on_click(|_ctx, data, _env| {
-                if data.showing_errors {
-                    set_visible(data, VisibleType::Results);
-                } else {
-                    set_visible(data, VisibleType::Errors);
-                }
                 data.showing_errors = !data.showing_errors;
             }),
     );
@@ -206,6 +200,9 @@ fn ui_builder() -> impl Widget<AppState> {
         .fix_size(40., 30.);
 
     let list = Scroll::new(List::new(|| RawLabel::new().padding(1.0)).lens(AppState::visible).padding(10.))
+        .background(Color::rgba8(0, 0, 0, 255))
+        .expand();
+    let error_list = Scroll::new(List::new(|| RawLabel::new().padding(1.0)).lens(AppState::visible_errors).padding(10.))
         .background(Color::rgba8(0, 0, 0, 255))
         .expand();
 
@@ -246,7 +243,7 @@ fn ui_builder() -> impl Widget<AppState> {
                 .with_flex_child(berrors, 0.5)
                 .with_flex_child(lcount, 0.5),
         )
-        .with_flex_child(list, 1.0)
+        .with_flex_child(Either::new(|st, _env| st.showing_errors, error_list, list), 1.0)
 }
 fn settings_panel() -> impl Widget<AppState> {
     Either::new(
@@ -323,9 +320,12 @@ impl AppDelegate<AppState> for Delegate {
             data.find_name = String::from("Stop");
 
             data.visible.clear();
+            data.visible_errors.clear();
+
             data.data.clear();
-            data.errors.clear();
+            data.done = false;
             data.interim_count = 0;
+            data.searched_count = 0;
 
             data.re_name = RegexBuilder::new(&data.text_name).case_insensitive(!data.name_case_sensitive).build();
             let mut pattern = data.text_contents.to_string();
@@ -351,7 +351,7 @@ impl AppDelegate<AppState> for Delegate {
             self.manager.set_options(ops);
 
             data.start = Instant::now();
-            self.manager.search(Search {
+            self.manager.search(&Search {
                 name_text: data.text_name.clone(),
                 contents_text: data.text_contents.clone(),
                 dir: data.dir.clone(),
@@ -361,10 +361,6 @@ impl AppDelegate<AppState> for Delegate {
 
         if let Some(mess) = cmd.get(UPDATEMESSAGE) {
             data.message = RichText::new(mess.clone().into());
-            return Handled::Yes;
-        }
-        if let Some(mess) = cmd.get(UPDATECOUNT) {
-            data.count = mess.clone();
             return Handled::Yes;
         }
 
@@ -383,10 +379,9 @@ impl AppDelegate<AppState> for Delegate {
         if let Some(results) = cmd.get(RESULTS) {
             match results {
                 SearchResult::FinalResults(results) => {
+                    data.done = true;
                     data.data = results.data.iter().map(|x| x.path.to_string()).collect();
                     data.raw_data = Arc::new(Some(results.clone()));
-
-                    set_visible(data, VisibleType::Results);
 
                     let filecount = results.data.iter().filter(|x| !x.is_folder).count();
                     let foldercount = results.data.len() - filecount;
@@ -420,34 +415,48 @@ impl AppDelegate<AppState> for Delegate {
 
                     string += &format!(" in {:.3}s", data.start.elapsed().as_secs_f64());
 
-                    if !data.errors.is_empty() {
-                        let mut str = format!("{} error", data.errors.len());
-                        if data.errors.len() > 1 {
-                            str.push_str("s");
+                    if results.stopped {
+                        string += " (stopped)";
+                    }
+
+                    if !data.visible_errors.is_empty() {
+                        let mut str = format!("{} error", data.visible_errors.len());
+                        if data.visible_errors.len() > 1 {
+                            str.push('s');
                         }
                         data.error_message = str;
                     }
 
                     data.message = RichText::new(string.into());
+                    data.find_name = "Find".to_string();
                 }
                 SearchResult::InterimResult(fi) => {
                     if data.visible.len() < MAX_NAMES {
-                        data.visible.push_back(highlight_result(
-                            fi,
-                            data.re_name.clone(),
-                            data.re_content.clone(),
-                            data.re_line.clone(),
-                            100,
-                        ));
+                        data.visible.push_back(highlight_result(fi, &data.re_content, &data.re_line, 100));
                     }
                     data.interim_count += 1;
 
                     if data.last_update.elapsed() > Duration::from_millis(100) {
-                        data.message = rich(&format!("Found {} Searching...", data.interim_count), Color::YELLOW);
+                        data.message = rich(
+                            &format!("Found {} in {} files and folders. Searching...", data.interim_count, data.searched_count),
+                            Color::YELLOW,
+                        );
                         data.last_update = Instant::now();
                     }
                 }
-                SearchResult::SearchErrors(errs) => data.errors.extend(errs.clone()),
+                SearchResult::SearchErrors(errs) => data.visible_errors.extend(errs.iter().map(|a| rich(a, Color::WHITE))),
+                SearchResult::SearchCount(count) => {
+                    if !data.done {
+                        data.searched_count = *count;
+                        if data.last_update.elapsed() > Duration::from_millis(100) {
+                            data.message = rich(
+                                &format!("Found {} in {} files and folders. Searching...", data.interim_count, data.searched_count),
+                                Color::YELLOW,
+                            );
+                            data.last_update = Instant::now();
+                        }
+                    }
+                }
             }
 
             return Handled::Yes;
@@ -500,48 +509,10 @@ impl AppDelegate<AppState> for Delegate {
     }
 }
 
-fn set_visible(data: &mut AppState, result_type: VisibleType) {
-    match result_type {
-        VisibleType::Results => {
-            if let Some(results) = &*data.raw_data {
-                let content_count: usize = results.data.iter().take(MAX_NAMES).map(|x| x.matches.len()).sum();
-                let mut max_per = usize::MAX;
-
-                if content_count > 0 {
-                    max_per = (MAX_CONTENT as f32 / content_count as f32 * results.data.iter().take(MAX_NAMES).count() as f32) as usize;
-                    max_per = max_per.max(1);
-                }
-                //create visible
-                //limited to fixed number of lines
-                //add colour and highlighting
-                //limit content
-                data.find_name = String::from("Find");
-                data.visible = results
-                    .data
-                    .iter()
-                    .take(MAX_NAMES)
-                    .map(|x| highlight_result(x, data.re_name.clone(), data.re_content.clone(), data.re_line.clone(), max_per))
-                    .collect();
-                if results.data.len() > MAX_NAMES {
-                    data.visible
-                        .push_back(RichText::new(format!("...AND {} others", results.data.len() - 1000).into()));
-                }
-            }
-        }
-        VisibleType::Errors => data.visible = data.errors.iter().take(MAX_NAMES).map(|x| rich(x, Color::WHITE)).collect(),
-    }
-}
-
-enum VisibleType {
-    Results,
-    Errors,
-}
-
 fn highlight_result(
     x: &FileInfo,
-    re_name: Result<Regex, regex::Error>,
-    re_content: Result<Regex, regex::Error>,
-    re_numbers: Result<Regex, regex::Error>,
+    re_content: &Result<Regex, regex::Error>,
+    re_numbers: &Result<Regex, regex::Error>,
     max_content_count: usize,
 ) -> RichText {
     let sym = if x.is_folder { "📁" } else { "📝" };
@@ -573,23 +544,19 @@ fn highlight_result(
         rich_with_path(&full, &x.path, Color::rgb8(58, 150, 221))
     };
     //highlight matches in name:
-    if let Ok(re) = &re_name {
-        if let Some(ranges) = re.captures(&x.name) {
-            let start = x.path.len() - x.name.len();
-            for cap in ranges.iter().flatten() {
-                let mut range = cap.range();
-                range.end += start + symlen + 1;
-                range.start += start + symlen + 1;
+    let start = x.path.len() - x.name.len();
+    for cap in x.ranges.iter() {
+        let mut range = cap.clone();
+        range.end += start + symlen + 1;
+        range.start += start + symlen + 1;
 
-                if range.end <= x.path.len() + symlen + 1 {
-                    if full.is_char_boundary(range.start) && full.is_char_boundary(range.end) {
-                        rich.add_attribute(range.clone(), Attribute::Weight(FontWeight::BOLD));
-                        rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(189, 60, 71)));
-                    }
-                } else {
-                    eprintln!("{range:?} is out of range of {}", x.path.len());
-                }
+        if range.end <= x.path.len() + symlen + 1 {
+            if full.is_char_boundary(range.start) && full.is_char_boundary(range.end) {
+                rich.add_attribute(range.clone(), Attribute::Weight(FontWeight::BOLD));
+                rich.add_attribute(range.clone(), Attribute::text_color(Color::rgb8(189, 60, 71)));
             }
+        } else {
+            eprintln!("{range:?} is out of range of {}", x.path.len());
         }
     }
     //highlight matches in content:

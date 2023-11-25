@@ -70,6 +70,7 @@ fn app(cx: Scope<()>) -> Element {
                                         name: "".to_string(),
                                         is_folder: false,
                                         plugin: None,
+                                        ranges: vec![],
                                     });
                                 };
                                 message.set(format!("Found {} in {:.2}s", found_count, fe.duration.as_secs_f32()));
@@ -93,10 +94,12 @@ fn app(cx: Scope<()>) -> Element {
                                         name: "".to_string(),
                                         is_folder: false,
                                         plugin: None,
+                                        ranges: vec![],
                                     });
                                 }
                             }
                             librusl::manager::SearchResult::SearchErrors(_) => { /*todo show errors*/ }
+                            librusl::manager::SearchResult::SearchCount(_) => {}
                         }
                     }
 
@@ -160,12 +163,14 @@ fn app(cx: Scope<()>) -> Element {
                             } else {
                                 message.set("Searching".to_string());
                                 man.with_mut(|x| {
-                                    x.search(Search {
-                                        name_text: text_name.to_string(),
-                                        contents_text: text_contents.to_string(),
-                                        dir: text_dir.to_string(),
-                                        ..Default::default()
-                                    })
+                                    x.search(
+                                        &Search {
+                                            name_text: text_name.to_string(),
+                                            contents_text: text_contents.to_string(),
+                                            dir: text_dir.to_string(),
+                                            ..Default::default()
+                                        },
+                                    )
                                 });
                             }
                         },

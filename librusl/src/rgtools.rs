@@ -14,7 +14,7 @@ use std::{
     io::{Cursor, Write},
     path::Path,
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicUsize, Ordering},
         Arc,
     },
 };
@@ -36,10 +36,11 @@ pub struct ContentResults {
 pub fn search_contents(
     pattern: &str,
     paths: &[OsString],
-    allowed_files: Option<HashSet<String>>,
+    allowed_files: &HashSet<String>,
     ops: ContentOptions,
-    must_stop: Arc<AtomicBool>,
-    counter: Arc<AtomicUsize>,
+    global_search_id: Arc<AtomicUsize>,
+    start_search_id: usize,
+    total_search_count: Option<Arc<AtomicUsize>>, //only Some if find contents, else None because we would have counted the file in the name search
 ) -> ContentResults {
     let case_insensitive = !ops.case_sensitive;
     let mut errors = vec![];
@@ -68,8 +69,11 @@ pub fn search_contents(
         .separator_field_match(SEPARATOR.as_bytes().to_vec())
         .build_no_color(my_write);
 
-    if let Some(allowed_files) = allowed_files {
+    if allowed_files.len() > 0 {
         for path in allowed_files {
+            if global_search_id.load(Ordering::Relaxed) != start_search_id {
+                return ContentResults::default();
+            }
             read_file(
                 &Path::new(&path),
                 &mut searcher,
@@ -77,20 +81,20 @@ pub fn search_contents(
                 &mut printer,
                 &mut errors,
                 &ops,
-                counter.clone(),
+                total_search_count.clone(),
             );
         }
     } else {
         for path in paths {
             for result in WalkDir::new(path) {
-                if must_stop.load(Ordering::Relaxed) {
+                if global_search_id.load(Ordering::Relaxed) != start_search_id {
                     return ContentResults::default();
                 }
 
                 let dent = match result {
                     Ok(dent) => dent,
-                    Err(err) => {
-                        errors.push(err.to_string());
+                    Err(_err) => {
+                        errors.push(format!("Could not read file {path:?}"));
                         continue;
                     }
                 };
@@ -98,14 +102,21 @@ pub fn search_contents(
                 if !dent.file_type().is_file() {
                     continue;
                 }
-                read_file(&dent.path(), &mut searcher, &matcher, &mut printer, &mut errors, &ops, counter.clone());
+                read_file(
+                    &dent.path(),
+                    &mut searcher,
+                    &matcher,
+                    &mut printer,
+                    &mut errors,
+                    &ops,
+                    total_search_count.clone(),
+                );
             }
         }
     }
-    ContentResults {
-        results: printer.into_inner().into_inner().string().split('\n').map(|x| x.to_string()).collect(),
-        errors,
-    }
+    let strings: Vec<String> = printer.into_inner().into_inner().string().split('\n').map(|x| x.to_string()).collect();
+
+    ContentResults { results: strings, errors }
 }
 fn read_file(
     path: &Path,
@@ -114,36 +125,42 @@ fn read_file(
     printer: &mut Standard<NoColor<MyWrite>>,
     errors: &mut Vec<String>,
     ops: &ContentOptions,
-    counter: Arc<AtomicUsize>,
+    total_search_count: Option<Arc<AtomicUsize>>,
 ) {
-    let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |f| Some(f + 1));
-
+    if let Some(total_search_count) = total_search_count.as_ref() {
+        total_search_count.fetch_add(1, Ordering::Relaxed);
+    }
     let file = File::open(path);
-    if let Ok(file) = file {
-        //normal grep
-        let result = searcher.search_file(matcher, &file, printer.sink_with_path(matcher, &path));
-        if let Err(err) = result {
-            errors.push(err.to_string());
-        }
+    match file {
+        Ok(file) => {
+            //normal grep
+            let result = searcher.search_file(matcher, &file, printer.sink_with_path(matcher, &path));
+            if let Err(_err) = result {
+                errors.push(format!("Could not read file {path:?}"));
+            }
 
-        //apply each of extensions
-        if ops.extended {
-            let extension = path.extension().unwrap_or_default().to_string_lossy().to_lowercase();
-            let extendeds = vec![ExtendedType::Pdf, ExtendedType::Office];
-            for ext in extendeds.iter().filter(|a| a.extensions().contains(&extension)) {
-                if let Ok(data) = ext.to_string(&path) {
-                    let cursor = Cursor::new(data);
-                    let result = searcher.search_reader(
-                        matcher,
-                        cursor,
-                        printer.sink_with_path(matcher, &format!("{}{}{}", path.to_string_lossy(), EXTENSION_SEPARATOR, ext.name())),
-                    );
-                    if let Err(err) = result {
-                        errors.push(err.to_string());
+            //apply each of extensions
+            if ops.extended {
+                let extension = path.extension().unwrap_or_default().to_string_lossy().to_lowercase();
+                let extendeds = vec![ExtendedType::Pdf, ExtendedType::Office];
+                for ext in extendeds.iter().filter(|a| a.extensions().contains(&extension)) {
+                    if let Ok(data) = ext.to_string(&path) {
+                        let cursor = Cursor::new(data);
+                        let result = searcher.search_reader(
+                            matcher,
+                            cursor,
+                            printer.sink_with_path(matcher, &format!("{}{}{}", path.to_string_lossy(), EXTENSION_SEPARATOR, ext.name())),
+                        );
+                        if let Err(_err) = result {
+                            errors.push(format!("Could not read file {path:?} with extension {ext:?}"));
+                        }
+                    } else {
                     }
-                } else {
                 }
             }
+        }
+        Err(_err) => {
+            errors.push(format!("Could not read {}", path.as_os_str().to_string_lossy()));
         }
     }
 }

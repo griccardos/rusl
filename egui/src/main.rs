@@ -4,27 +4,28 @@
 
 use std::{
     path::PathBuf,
+    process,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
 };
 
-use eframe::egui::{self, Grid, ScrollArea};
-
+use eframe::egui::{self, Grid, ScrollArea, ViewportBuilder};
 use librusl::{
+    fileinfo::FileInfo,
     manager::{FinalResults, Manager, SearchResult},
     search::Search,
 };
 
 pub fn main() {
     let native_options = eframe::NativeOptions {
-        icon_data: Some(load_icon()),
+        //icon_data: Some(load_icon()),
+        viewport: ViewportBuilder::default().with_icon(load_icon()),
         ..Default::default()
     };
-
     eframe::run_native("rusl", native_options, Box::new(|cc| Box::new(AppState::new(cc)))).expect("Could not run");
 }
-fn load_icon() -> eframe::IconData {
+fn load_icon() -> egui::IconData {
     let (icon_rgba, icon_width, icon_height) = {
         let image = image::load_from_memory(include_bytes!("icons/icon.png")).unwrap().into_rgba8();
         let (width, height) = image.dimensions();
@@ -32,7 +33,7 @@ fn load_icon() -> eframe::IconData {
         (rgba, width, height)
     };
 
-    eframe::IconData {
+    egui::IconData {
         rgba: icon_rgba,
         width: icon_width,
         height: icon_height,
@@ -44,6 +45,7 @@ pub struct AppState {
     search_content: String,
     show_settings: bool,
     results: Arc<Mutex<FinalResults>>,
+    interim: Arc<Mutex<Vec<FileInfo>>>,
     manager: Manager,
     message: String,
     last_id: usize,
@@ -77,12 +79,15 @@ impl AppState {
             data: vec![],
             duration: Duration::from_secs(0),
             id: 0,
+            stopped: false,
         }));
+        let interim = Arc::new(Mutex::new(vec![]));
         let results_thread = results.clone();
+        let interim_thread = interim.clone();
 
         let (sx, rx) = std::sync::mpsc::channel();
         let manager = Manager::new(sx);
-        spawn_receiver(rx, results_thread, cc.egui_ctx.clone());
+        spawn_receiver(rx, results_thread, interim_thread, cc.egui_ctx.clone());
 
         Self {
             // Example stuff:
@@ -91,19 +96,20 @@ impl AppState {
 
             show_settings: false,
             results,
+            interim,
             manager,
             message: "Ready to search".to_string(),
             last_id: 0,
         }
     }
 
-    fn menu(&mut self, frame: &mut eframe::Frame, ctx: &egui::Context) {
+    fn menu(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("Quit").clicked() {
                         self.manager.save_and_quit();
-                        frame.close();
+                        process::exit(0);
                     }
                 });
             });
@@ -168,7 +174,8 @@ impl AppState {
         } else if !PathBuf::from(&self.manager.get_options().last_dir).exists() {
             self.message = "Invalid directory".to_string();
         } else {
-            self.manager.search(Search {
+            self.interim.lock().unwrap().clear();
+            self.manager.search(&Search {
                 name_text: self.search_name.clone(),
                 contents_text: self.search_content.clone(),
                 dir: self.manager.get_options().last_dir,
@@ -202,36 +209,51 @@ impl AppState {
         ScrollArea::new([true, true]).min_scrolled_height(200.).show(ui, |ui| {
             Grid::new("grid").num_columns(2).striped(true).show(ui, |ui| {
                 if let Ok(results) = self.results.try_lock() {
-                    for r in results.data.iter().take(2000) {
-                        ui.label(&r.path);
-                        const MAX_COUNT: usize = 100;
-                        const MAX_LEN: usize = 200;
-                        let mut content = r.content(MAX_COUNT, MAX_LEN);
-                        if r.matches.len() > MAX_COUNT {
-                            content.push_str(&format!("\nand {} other lines", r.matches.len() - MAX_COUNT));
+                    if !results.data.is_empty() {
+                        self.draw_fileinfos(&results.data, ui);
+                        if results.id != self.last_id {
+                            self.last_id = results.id;
+                            self.message = format!("Found {} results in {:.2}s", results.data.len(), results.duration.as_secs_f64());
                         }
-                        if !content.is_empty() {
-                            ui.label(&content);
+                    } else {
+                        if let Ok(interim) = self.interim.try_lock() {
+                            self.draw_fileinfos(&interim, ui);
                         }
-                        ui.end_row();
-                    }
-                    if results.data.len() > 2000 {
-                        ui.label(format!("and {} others...", results.data.len() - 2000));
-                    }
-                    if results.id != self.last_id {
-                        self.last_id = results.id;
-                        self.message = format!("Found {} results in {:.2}s", results.data.len(), results.duration.as_secs_f64());
                     }
                 }
             });
         });
     }
+
+    fn draw_fileinfos(&self, results: &[FileInfo], ui: &mut egui::Ui) {
+        for r in results.iter().take(2000) {
+            ui.label(&r.path);
+            const MAX_COUNT: usize = 100;
+            const MAX_LEN: usize = 200;
+            let mut content = r.content(MAX_COUNT, MAX_LEN);
+            if r.matches.len() > MAX_COUNT {
+                content.push_str(&format!("\nand {} other lines", r.matches.len() - MAX_COUNT));
+            }
+            if !content.is_empty() {
+                ui.label(&content);
+            }
+            ui.end_row();
+        }
+        if results.len() > 2000 {
+            ui.label(format!("and {} others...", results.len() - 2000));
+        }
+    }
 }
 
-fn spawn_receiver(rx: std::sync::mpsc::Receiver<SearchResult>, results_thread: Arc<Mutex<FinalResults>>, context: egui::Context) {
+fn spawn_receiver(
+    rx: std::sync::mpsc::Receiver<SearchResult>,
+    results_thread: Arc<Mutex<FinalResults>>,
+    interim: Arc<Mutex<Vec<FileInfo>>>,
+    context: egui::Context,
+) {
     thread::spawn(move || loop {
-        if let Ok(rec) = rx.recv() {
-            match rec {
+        match rx.recv() {
+            Ok(rec) => match rec {
                 SearchResult::FinalResults(res) => {
                     let mut res_self = results_thread.lock().unwrap();
                     if res.id > res_self.id {
@@ -241,14 +263,16 @@ fn spawn_receiver(rx: std::sync::mpsc::Receiver<SearchResult>, results_thread: A
                         context.request_repaint();
                     }
                 }
-                SearchResult::InterimResult(_) => {
-                    //TODO. currently only final results are loaded.
+                SearchResult::InterimResult(fi) => {
                     //this is to show interim results as they are received
+                    interim.lock().unwrap().push(fi);
                 }
                 SearchResult::SearchErrors(_) => { /*todo show errors*/ }
-            };
-        } else {
-            println!("error recv");
+                SearchResult::SearchCount(_) => {}
+            },
+            Err(err) => {
+                eprintln!("Error: {err:?}:{err}")
+            }
         }
     });
 }

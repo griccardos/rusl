@@ -1,13 +1,14 @@
 [package]
 name = "rusl"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 build = "build.rs"
 
 [dependencies]
 librusl={path="../librusl"}
 rfd = "0.12.1" #for selecting directory for gui
-iced = { git= "https://github.com/iced-rs/iced", features = ["debug", "tokio"] }#gui
+iced = { git= "https://github.com/iced-rs/iced", features = ["debug", "tokio","highlighter"] }#gui
+iced_core={git="https://github.com/iced-rs/iced"}
 image = "0.24.7"#for icon
 
 [build-dependencies]

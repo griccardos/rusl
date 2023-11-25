@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Search {
     pub dir: String,
     pub name_text: String,

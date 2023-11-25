@@ -5,6 +5,8 @@ use librusl::manager::{Manager, SearchResult};
 use librusl::options::{FTypes, Sort};
 use librusl::search::Search;
 use std::sync::mpsc;
+use std::time::Instant;
+use std::vec;
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -38,29 +40,41 @@ pub fn main() {
         let weak = weak_receiver.clone();
         let mut current: Vec<FileInfo> = vec![];
         let mut counter = 0;
+        let mut last_update = Instant::now();
         loop {
             match result_receiver.recv().unwrap() {
                 SearchResult::FinalResults(res) => {
                     set_data(weak.clone(), res.data.iter().map(|x| x.to_owned()).collect(), res.duration, true);
                     current.clear();
                     counter = 0;
-
+                    let count = res.data.len();
                     *results_receiver.lock().unwrap() = res.data;
+                    let _ = weak.upgrade_in_event_loop(move |weak| {
+                        weak.set_searching(false);
+                        weak.set_find_button("Find".into());
+                        weak.set_message(format!("Found {count} in {:.3}s", res.duration.as_secs_f64()).into());
+                    });
                 }
                 SearchResult::InterimResult(res) => {
                     counter += 1;
                     if current.len() < 1000 {
                         current.push(res);
-                        set_data(
-                            weak.clone(),
-                            current.iter().map(|x| x.to_owned()).collect(),
-                            Duration::from_secs(0),
-                            false,
-                        );
+
+                        if last_update.elapsed() > Duration::from_millis(100) {
+                            set_data(
+                                weak.clone(),
+                                current.iter().map(|x| x.to_owned()).collect(),
+                                Duration::from_secs(0),
+                                false,
+                            );
+                            last_update = Instant::now();
+                        }
                     }
+
                     let _ = weak.upgrade_in_event_loop(move |weak| weak.set_message(format!("Found {counter} ...").into()));
                 }
                 SearchResult::SearchErrors(_) => {}
+                SearchResult::SearchCount(_) => {}
             };
         }
     });
@@ -72,6 +86,8 @@ pub fn main() {
         let weak = weak_edited.clone().unwrap();
         let name_text = weak.get_find_text().as_str().to_string();
         let content_text = weak.get_content_find_text().as_str().to_string();
+        let searching = weak.get_searching();
+
         let dir = weak.get_directory().as_str().to_owned();
         let search = Search {
             name_text: name_text.to_string(),
@@ -95,7 +111,18 @@ pub fn main() {
 
         weak.set_message("Searching...".into());
 
-        manager.search(search);
+        if searching {
+            manager.stop();
+            weak.set_searching(false);
+            weak.set_find_button("Find".into());
+        } else {
+            weak.set_searching(true);
+            weak.set_find_button("Stop".into());
+            let model = VecModel::<SFileInfo>::from(vec![]);
+            let modelrc = ModelRc::new(model);
+            weak.set_files(modelrc);
+            manager.search(&search);
+        }
     });
 
     //on change sort method, we resort

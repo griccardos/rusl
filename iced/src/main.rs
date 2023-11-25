@@ -1,5 +1,5 @@
 //hide windows console
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+//#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{
     sync::mpsc::{channel, Receiver},
@@ -35,6 +35,7 @@ struct App {
     receiver: Receiver<SearchResult>,
     message: String,
     found: usize,
+    searching: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +53,7 @@ pub enum Message {
 pub fn main() {
     let mut sets = Settings::<()> {
         default_text_size: iced::Pixels::from(18.),
+        // default_font: Font::MONOSPACE,
         antialiasing: true,
         ..Default::default()
     };
@@ -85,6 +87,7 @@ impl Application for App {
             manager: man,
             receiver: r,
             found: 0,
+            searching: false,
         };
         (d, widget::focus_next())
     }
@@ -163,7 +166,11 @@ impl Application for App {
                 Row::new()
                     .spacing(15)
                     .align_items(iced::Alignment::End)
-                    .push(Button::new(Text::new("Find")).on_press(Message::FindPressed))
+                    .push(if self.searching {
+                        Button::new(Text::new("Stop")).on_press(Message::FindPressed)
+                    } else {
+                        Button::new(Text::new("Find")).on_press(Message::FindPressed)
+                    })
                     .push(Text::new(&self.message))
                     .push(clipboard),
             )
@@ -173,14 +180,22 @@ impl Application for App {
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
             Message::FindPressed => {
-                self.results.clear();
-                self.found = 0;
-                self.message = "Searching...".to_string();
-                self.manager.search(Search {
-                    dir: self.directory.clone(),
-                    name_text: self.name.clone(),
-                    contents_text: self.contents.clone(),
-                })
+                if self.searching {
+                    self.manager.stop();
+                    self.message = format!("Found {} items. Stopped", self.found);
+
+                    self.searching = false;
+                } else {
+                    self.results.clear();
+                    self.searching = true;
+                    self.found = 0;
+                    self.message = "Searching...".to_string();
+                    self.manager.search(&Search {
+                        dir: self.directory.clone(),
+                        name_text: self.name.clone(),
+                        contents_text: self.contents.clone(),
+                    })
+                }
             }
             Message::NameChanged(nn) => self.name = nn,
             Message::ContentsChanged(con) => self.contents = con,
@@ -196,8 +211,9 @@ impl Application for App {
                 while let Ok(res) = self.receiver.try_recv() {
                     match res {
                         SearchResult::FinalResults(res) => {
+                            self.searching = false;
                             self.message = format!("Found {} items in {:.2}s", res.data.len(), res.duration.as_secs_f64());
-                            self.results = res.data.iter().take(1000).cloned().collect();
+                            //self.results = res.data.iter().take(1000).cloned().collect();
                             if res.data.len() > 1000 {
                                 self.results.push(FileInfo {
                                     path: format!("...and {} others", res.data.len() - 1000),
@@ -206,6 +222,7 @@ impl Application for App {
                                     name: "".into(),
                                     is_folder: false,
                                     plugin: None,
+                                    ranges: vec![],
                                 });
                             }
                         }
@@ -217,7 +234,11 @@ impl Application for App {
                             self.message = format!("Found {}, searching...", self.found);
                         }
                         SearchResult::SearchErrors(_) => {}
+                        SearchResult::SearchCount(_) => {}
                     }
+                }
+                if let Err(std::sync::mpsc::TryRecvError::Disconnected) = self.receiver.try_recv() {
+                    return Command::none();
                 }
             }
             Message::OpenDirectory => {
@@ -245,6 +266,7 @@ impl Application for App {
                 self.message = "Copied to clipboard".to_string();
             }
         }
+
         Command::none()
     }
     fn theme(&self) -> Theme {

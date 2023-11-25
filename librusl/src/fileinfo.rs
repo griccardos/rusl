@@ -10,6 +10,7 @@ pub struct FileInfo {
     pub name: String,
     pub is_folder: bool,
     pub plugin: Option<ExtendedType>,
+    pub ranges: Vec<std::ops::Range<usize>>, //TODO: save ranges for highlighting
 }
 
 impl FileInfo {
@@ -34,4 +35,5 @@ impl FileInfo {
 pub struct Match {
     pub line: usize,
     pub content: String,
+    pub ranges: Vec<std::ops::Range<usize>>,
 }
