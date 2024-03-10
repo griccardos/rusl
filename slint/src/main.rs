@@ -215,39 +215,48 @@ fn get_and_update_options(manager: Arc<Mutex<Manager>>, weak: Weak<MainWindow>) 
 fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, finished: bool) {
     let _ = weak.upgrade_in_event_loop(move |weak| {
         let count = files.len() as i32;
-        let max_count = 100;
+        let max_count = 1000;
         let max_len = 400;
         let is_content_search = weak.get_content_find_text().len() != 0;
-        let is_linux = cfg!(target_os = "linux");
+        let ops = if cfg!(linux) {
+            "linux"
+        } else if cfg!(windows) {
+            "windows"
+        } else {
+            "mac"
+        };
 
         let mut sfiles: Vec<SFileInfo> = files
             .iter()
             .take(1000)
             .map(|x| {
-                let mut content = x.content(max_count, max_len);
-                if x.matches.len() > max_count {
-                    content.push_str(&format!("\nand {} other lines", x.matches.len() - max_count));
-                };
-
-                let pre = match (is_content_search, is_linux, x.is_folder) {
+                let pre = match (is_content_search, ops, x.is_folder) {
                     (true, _, _) => "",
-                    (false, true, true) => "🗁",
-                    (false, true, false) => " 🗏 ",
-                    (false, false, true) => "📁",
-                    (false, false, false) => "📝",
+                    (false, "linux", true) => "🗁",
+                    (false, "linux", false) => " 🗏 ",
+                    (false, _, true) => "📁",
+                    (false, _, false) => "📝",
                 };
+                let data = x
+                    .matches
+                    .iter()
+                    .map(|mat| MatchInfo {
+                        content: FileInfo::limited_match(mat, max_len, false).into(),
+                        line: format!("{}:", mat.line).into(),
+                    })
+                    .collect::<Vec<_>>();
 
                 SFileInfo {
                     pre: pre.into(),
                     name: x.path.clone().into(),
-                    data: content.into(),
+                    data: data[..].into(),
                 }
             })
             .collect();
-        if count > 1000 {
+        if count > max_count {
             sfiles.push(SFileInfo {
                 pre: "".into(),
-                data: "".into(),
+                data: [].into(),
                 name: format!("...and {} others", count - 1000).into(),
             });
         }

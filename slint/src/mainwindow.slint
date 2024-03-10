@@ -1,10 +1,15 @@
 import{LineEdit,CheckBox,ListView,ComboBox,TabWidget,StandardButton ,TextEdit,Button } from "std-widgets.slint";
 
+export struct MatchInfo{
+    content:string,
+    line:string,
+ }
 export struct SFileInfo {
     pre:string,
     name:string,
-    data:string
+    data:[MatchInfo]
  }
+
 
 export component MainWindow inherits Window {
     title: "Rusl";
@@ -14,7 +19,7 @@ export component MainWindow inherits Window {
     in-out property <string> directory:".";
     property <bool> show_options;
     in-out property <bool> export_enabled:false;
-    in-out property <string>selected_sort:"None";
+    in-out property <string> selected_sort:"None";
     in-out property <bool> error_dir:false;
     in-out property <bool> searching;
     in-out property <string> find_button:"Find";
@@ -29,263 +34,318 @@ export component MainWindow inherits Window {
 
     //for files
     in-out property <string> find_text;
-    in-out property <bool>case_sensitive;
-    in-out property <string>selected_ftypes:"All";
+    in-out property <bool> case_sensitive;
+    in-out property <string> selected_ftypes:"All";
 
     //for contents
     in-out property <string> content_find_text;
-    in-out property <bool>content_case_sensitive;
+    in-out property <bool> content_case_sensitive;
 
-    
     preferred-width: 1000px;
     preferred-height: 800px;
     min-width: 500px;
     max-width: 2000px;
     default-font-size: 17px;
-    VerticalLayout { 
+    VerticalLayout {
         padding: 5px;
         spacing: 20px;
-        
-       
-                Rectangle { 
-                    VerticalLayout { 
-                        HorizontalLayout {
-                            padding: 5px;
-                            height:50px;
-                            Text { 
-                                text:"File name";
-                                width:130px;
-                                color: white;
-                                vertical-alignment: center;
-                             }
-                            edit:= LineEdit { 
-                                placeholder-text:"Regex file name search e.g. ^mai.*rs$ or r.st or ^best";
-                                height:40px;
-                                text <=> root.find-text;
-                                accepted => { root.search(); }
-                            }
-                           
-                        
+        Rectangle {
+            VerticalLayout {
+                HorizontalLayout {
+                    padding: 5px;
+                    height: 50px;
+                    Text {
+                        text: "File name";
+                        width: 130px;
+                        color: white;
+                        vertical-alignment: center;
+                    }
+
+                    edit := LineEdit {
+                        placeholder-text: "Regex file name search e.g. ^mai.*rs$ or r.st or ^best";
+                        height: 40px;
+                        text <=> root.find-text;
+                                accepted => {
+                            root.search();
                         }
-                        HorizontalLayout { 
-                            padding: 5px;
-                            height:50px;
-                            Text { 
-                                text:"File contents";
-                                width:130px;
-                                color: white;
-                                vertical-alignment: center;
-                             }
-                            LineEdit { 
-                                placeholder-text:"Regex content search e.g. str.{2}g";
-                                height:40px;
-                                text <=> root.content_find_text;
-                                accepted => { root.search(); }
-                    
-                            }
-                           
-                        
+                    }
+                }
+
+                HorizontalLayout {
+                    padding: 5px;
+                    height: 50px;
+                    Text {
+                        text: "File contents";
+                        width: 130px;
+                        color: white;
+                        vertical-alignment: center;
+                    }
+
+                    LineEdit {
+                        placeholder-text: "Regex content search e.g. str.{2}g";
+                        height: 40px;
+                        text <=> root.content_find_text;
+                                accepted => {
+                            root.search();
                         }
-                        HorizontalLayout { 
-                            padding: 5px;
-                            height:50px;
-                            Text { 
-                                text:"Directory";
-                                width:130px;
-                                color: white;
-                                vertical-alignment: center;
-                             }
-                            Button { 
-                                text: "🗁";
-                                height: 40px;
-                                width: 60px;
-                                clicked => { root.dir-clicked();}
-                             }
-                            Rectangle {
-                                background: root.error-dir?red:transparent;
-                                height: 42px;
-                                LineEdit { 
-                                    x:2px;
-                                    y:2px;
-                                    width:parent.width -4px;
-                                height:38px;
-                                
-                                text <=> root.directory;
-                                edited => { root.dir-changed();} 
-                                accepted => { root.search(); }
+                    }
+                }
+
+                HorizontalLayout {
+                    padding: 5px;
+                    height: 50px;
+                    Text {
+                        text: "Directory";
+                        width: 130px;
+                        color: white;
+                        vertical-alignment: center;
+                    }
+
+                    Button {
+                        text: "📁";
+                        height: 40px;
+                        width: 60px;
+                        clicked => {
+                            root.dir-clicked();
+                        }
+                    }
+
+                    Rectangle {
+                        background: root.error-dir ? red : transparent;
+                        height: 42px;
+                        LineEdit {
+                            x: 2px;
+                            y: 2px;
+                            width: parent.width - 4px;
+                            height: 38px;
+                            text <=> root.directory;
+                                edited => {
+                                root.dir-changed();
+                            }
+                            accepted => {
+                                root.search();
                             }
                         }
                     }
-                    HorizontalLayout { 
-                        padding: 5px;
-                        height:50px;
-                   
-                        Button { 
-                            text: root.find-button;
-                            height: 40px;
-                            width: 80px;
-                            clicked => { search();  }
-                         }
-                        
-                         HorizontalLayout { 
-                            alignment: end;
-                        
+                }
 
-                         Text{text:"Sort"; height: 40px; color:white; vertical-alignment: center;}
-                         Rectangle { width:10px; }
-                         ComboBox {  
-                             height: 40px;
-                             width: 200px;
-                             model: ["None", "Path", "Name", "Extension"];
-                             current-value<=> root.selected_sort; 
-                             selected => { root.sort_changed(); }
-                         }
-                         Rectangle { width:10px; }
-                         Button { 
+                HorizontalLayout {
+                    padding: 5px;
+                    height: 50px;
+                    Button {
+                        text: root.find-button;
+                        height: 40px;
+                        width: 80px;
+                        clicked => {
+                            search();
+                        }
+                    }
+
+                    HorizontalLayout {
+                        alignment: end;
+
+                        Text {
+                            text: "Sort";
+                            height: 40px;
+                            color: white;
+                            vertical-alignment: center;
+                        }
+
+                        Rectangle {
+                            width: 10px;
+                        }
+
+                        ComboBox {
+                            height: 40px;
+                            width: 200px;
+                            model: ["None", "Path", "Name", "Extension"];
+                            current-value<=> root.selected_sort; 
+                             selected => {
+                                root.sort_changed();
+                            }
+                        }
+
+                        Rectangle {
+                            width: 10px;
+                        }
+
+                        Button {
                             text: "⚙️";
                             height: 40px;
                             width: 60px;
-                            clicked => { root.show-options=!root.show-options;}
-                         }
-                         Rectangle { width:10px; }
-                         exp:=Button { 
-                             text:"Export";
-                             enabled<=>root.export_enabled;
-                             clicked => { popup.show(); }
-                          }
-                          
-                        
-                          popup := PopupWindow {
-                              x:exp.x - 10px;
-                              y:exp.y+exp.height;
-                             VerticalLayout {
-                                      Button {   text: "Full paths"; clicked => { export(1); } }
-                                      Button {   text: "Names"; clicked => { export(2); } }
-                              }
-                         }
-                        }
-                        
-                    }
-                        if show-options:
-                        HorizontalLayout { 
-                            padding: 5px;
-                            Rectangle { 
-                                border-radius: 4px;
-                                background: #332d2d;
-                                VerticalLayout { 
-                                    padding: 10px;
-                                    
-                                Text { 
-                                    text:"Names"; 
-                                    height: 20px;
-                                    font-weight: 800;
-                            }
-                                HorizontalLayout { 
-                                    spacing: 10px;
-                                    padding: 0px;
-                                    CheckBox { 
-                                        text: "Case sensitive";
-                                        height: 30px;
-                                        checked<=> root.case-sensitive;
-                                    }
-                                    HorizontalLayout { 
-                                        alignment: start;
-                    
-                                        Rectangle { width:20px; }
-                                        Text{ 
-                                            vertical-alignment: center;    
-                                            width:90px;
-                                            text:"File types";
-                                        }
-                                        VerticalLayout { //needed because combobox doesnt have vertical alignment
-                                                alignment: center;
-                                                ComboBox {
-                                                    height: 30px;
-                                                    width: 200px;
-                                                    model: ["All", "Files", "Directories"];
-                                                    current-value<=> root.selected-ftypes;
-                                                }
-                                        }
-                                    }
-                                }
-                                Text { 
-                                    text:"Contents"; height:40px; 
-                                    vertical-alignment: bottom;
-                                    font-weight: 800;
-                                }
-                                HorizontalLayout { 
-                                    spacing: 10px;
-                                    CheckBox { 
-                                        text: "Case sensitive";
-                                        height: 30px;
-                                        checked<=> root.content_case_sensitive;
-                                    }
-                                }
-                            }
+                            clicked => {
+                                root.show-options = !root.show-options;
                             }
                         }
-                       
-                 
-                    }
-                }
-                    
-        
-        VerticalLayout { 
-       
-        Rectangle { 
-            padding-left: 10px;
-            height: 40px;
-            
-            VerticalLayout { 
-                alignment: end;
-                x:10px;
-                padding-bottom: 10px;
-            Text { 
-                text:message;
-                color: white;
-                height: 30px;
-                vertical-alignment: center;
-            }
-            }
-      
-        }
-        Rectangle { 
-            background:black;
-            padding: 20px; 
-         
-        result_list:=ListView { 
-        
-            for f in files: 
-            HorizontalLayout{
-                alignment: start;
-                width: parent.width -20px;
 
-                VerticalLayout { 
-                    padding: 2px;
-                    HorizontalLayout { 
-                        if f.pre!="":
-                    Text{
-                        width: 40px;
-                        text:f.pre;
-                        color: white; 
-                    }
-                    Text{
-                        text:f.name;
-                        color: rgb(58, 150, 221); 
-                        overflow: elide;
+                        Rectangle {
+                            width: 10px;
+                        }
+
+                        exp := Button {
+                            text: "Export";
+                            enabled<=>root.export_enabled;
+                             clicked => {
+                                popup.show();
+                            }
+                        }
+
+                        popup := PopupWindow {
+                            x: exp.x - 10px;
+                            y: exp.y + exp.height;
+                            VerticalLayout {
+                                Button {
+                                    text: "Full paths";
+                                    clicked => {
+                                        export(1);
+                                    }
+                                }
+
+                                Button {
+                                    text: "Names";
+                                    clicked => {
+                                        export(2);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-                    if f.data!="":
-                    Text{
-                        text:f.data;
-                        color: rgb(164,164,164); 
-                        overflow: elide;
+
+                if show-options:
+                        HorizontalLayout {
+                    padding: 5px;
+                    Rectangle {
+                        border-radius: 4px;
+                        background: #332d2d;
+                        VerticalLayout {
+                            padding: 10px;
+                            Text {
+                                text: "Names";
+                                height: 20px;
+                                font-weight: 800;
+                            }
+
+                            HorizontalLayout {
+                                spacing: 10px;
+                                padding: 0px;
+                                CheckBox {
+                                    text: "Case sensitive";
+                                    height: 30px;
+                                    checked<=> root.case-sensitive;
+                                    
+                                
+                                }
+
+                                HorizontalLayout {
+                                    alignment: start;
+                                    Rectangle {
+                                        width: 20px;
+                                    }
+
+                                    Text {
+                                        vertical-alignment: center;
+                                        width: 90px;
+                                        text: "File types";
+                                    }
+
+                                    VerticalLayout {
+                                        //needed because combobox doesnt have vertical alignment
+                                                alignment: center;
+                                        ComboBox {
+                                            height: 30px;
+                                            width: 200px;
+                                            model: ["All", "Files", "Directories"];
+                                            current-value<=> root.selected-ftypes;
+                                                
+                                        
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text {
+                                text: "Contents";
+                                height: 40px;
+                                vertical-alignment: bottom;
+                                font-weight: 800;
+                            }
+
+                            HorizontalLayout {
+                                spacing: 10px;
+                                CheckBox {
+                                    text: "Case sensitive";
+                                    height: 30px;
+                                    checked<=> root.content_case_sensitive;
+                                    
+                                
+                                }
+                            }
+                        }
                     }
                 }
+            }
+        }
+
+        VerticalLayout {
+            Rectangle {
+                padding-left: 10px;
+                height: 40px;
+                VerticalLayout {
+                    alignment: end;
+                    x: 10px;
+                    padding-bottom: 10px;
+                    Text {
+                        text: message;
+                        color: white;
+                        height: 30px;
+                        vertical-alignment: center;
+                    }
                 }
-                
+            }
+
+            Rectangle {
+                background: black;
+                padding: 20px;
+                result_list := ListView {
+                    for f in files: HorizontalLayout {
+                        alignment: start;
+                        width: parent.width - 20px;
+
+                        VerticalLayout {
+                            padding: 2px;
+                            HorizontalLayout {
+                                if f.pre != "":
+                                    Text {
+                                    width: 40px;
+                                    text: f.pre;
+                                    color: white;
+                                }
+                                Text {
+                                    text: f.name;
+                                    color: rgb(58, 150, 221);
+                                    overflow: elide;
+                                }
+                            }
+
+                            for m in f.data: HorizontalLayout {
+                                padding: 2px;
+                                Text {
+                                    width: 40px;
+                                    text: m.line;
+                                    color: green;
+                                }
+
+                                Text {
+                                    text: m.content;
+                                    color: rgb(164,164,164);
+                                    overflow: elide;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
-    }
-    }
-    }
+}
