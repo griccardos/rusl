@@ -18,16 +18,18 @@ impl FileInfo {
         self.matches
             .iter()
             .take(max_count)
-            .map(|x| {
-                //limit content line length
-                let fixed = match x.content.char_indices().nth(max_length) {
-                    None => Cow::from(&x.content),
-                    Some((idx, _)) => Cow::from(format!("{}...", &x.content[..idx])),
-                };
-                format!("{}: {}", x.line, fixed.trim_end())
-            })
+            .map(|x| FileInfo::limited_match(x, max_length, true))
             .collect::<Vec<String>>()
             .join("\n")
+    }
+    pub fn limited_match(x: &Match, max_length: usize, line_number: bool) -> String {
+        //limit content line length
+        let fixed = match x.content.char_indices().nth(max_length) {
+            None => Cow::from(&x.content),
+            Some((idx, _)) => Cow::from(format!("{}...", &x.content[..idx])),
+        };
+        let num = if line_number { format!("{}: ", x.line) } else { String::new() };
+        format!("{}{}", num, fixed.trim_end())
     }
 }
 
