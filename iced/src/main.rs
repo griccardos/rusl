@@ -1,6 +1,5 @@
 //hide windows console
-//#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::{
     sync::mpsc::{channel, Receiver},
     time::Duration,
@@ -8,13 +7,13 @@ use std::{
 
 use iced::{
     event, executor,
-    keyboard::Event,
+    keyboard::{key::Named, Event, Key},
     widget::scrollable,
     widget::Button,
     widget::Column,
+    widget::Row,
     widget::{self, Text},
     widget::{mouse_area, Space},
-    widget::{tooltip, Row},
     widget::{Container, TextInput},
     window::icon,
     Application, Color, Command, Element, Length, Settings, Subscription, Theme,
@@ -113,32 +112,27 @@ impl Application for App {
             )
         };
         let dir = TextInput::new("", &self.directory).on_input(Message::DirectoryChanged).padding(4);
-        let res = Column::with_children(
-            self.results
-                .iter()
-                .map(|x| {
-                    let max = 100;
-                    let maxlen = 200;
-                    let mut content = x.content(max, maxlen);
-                    if x.matches.len() > max {
-                        content.push_str(&format!("\nand {} other lines", x.matches.len() - max));
-                    }
-                    let file = tooltip::Tooltip::new(
-                        mouse_area(Text::new(&x.path).style(Color::from_rgb8(100, 200, 100)))
-                            .on_press(Message::CopyToClipboard(vec![x.path.clone()])),
-                        "Click to copy path to clipboard",
-                        tooltip::Position::Right,
-                    );
+        let res = Column::with_children(self.results.iter().map(|x| {
+            let max = 50;
+            let maxlen = 200;
 
-                    let mut col = Column::new().push(file);
-                    if !content.is_empty() {
-                        let details = Text::new(content).width(Length::Fill);
-                        col = col.push(details);
-                    }
-                    Row::new().spacing(10).push(col).into()
-                })
-                .collect(),
-        );
+            let file = Text::new(&x.path).color(Color::from_rgb8(120, 120, 255));
+            let mut col = Column::new().push(file);
+            for mat in x.matches.iter().take(max) {
+                let content = format!("{}", FileInfo::limited_match(mat, maxlen, false));
+                let num = Text::new(format!("{}:", mat.line)).width(50.).color(Color::from_rgb8(0, 200, 0));
+                let details = Text::new(content).width(Length::Fill).color(Color::from_rgb8(200, 200, 200));
+                let row = Row::new().push(num).push(details);
+                col = col.push(row);
+            }
+            if x.matches.len() > max {
+                col = col.push(Text::new(format!("and {} other lines", x.matches.len() - max)));
+            }
+            let mou = mouse_area(col)
+                .on_press(Message::CopyToClipboard(vec![x.path.clone()]))
+                .interaction(iced::mouse::Interaction::Grabbing);
+            Row::new().spacing(10).push(mou).into()
+        }));
         let res = scrollable::Scrollable::new(res);
         Column::new()
             .padding(10)
@@ -247,8 +241,9 @@ impl Application for App {
                 }
             }
             Message::Event(iced::Event::Keyboard(Event::KeyPressed {
-                key_code: iced::keyboard::KeyCode::Tab,
+                key: Key::Named(Named::Tab),
                 modifiers,
+                ..
             })) => {
                 return if modifiers.shift() {
                     widget::focus_previous()
@@ -256,7 +251,7 @@ impl Application for App {
                     widget::focus_next()
                 };
             }
-            Message::Event(iced::Event::Window(iced::window::Event::CloseRequested)) => {
+            Message::Event(iced::Event::Window(_, iced::window::Event::CloseRequested)) => {
                 self.manager.save_and_quit();
             }
 
