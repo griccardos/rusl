@@ -1,6 +1,5 @@
 //hide windows console
-//#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::{
     ops::Range,
     sync::mpsc::{channel, Receiver},
@@ -207,6 +206,7 @@ impl App {
         );
 
         let res = scrollable(res);
+
         Column::new()
             .padding(10)
             .spacing(10)
@@ -374,8 +374,8 @@ impl App {
                 }
             }
             Message::Event(iced::Event::Keyboard(Event::KeyPressed {
-                modifiers,
                 key: Key::Named(Named::Tab),
+                modifiers,
                 ..
             })) => {
                 return if modifiers.shift() {

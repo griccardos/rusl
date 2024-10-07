@@ -1,3 +1,5 @@
 /target
 .vscode
 .vs
+target/
+.DS_Store
