@@ -2,27 +2,27 @@
 //#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{
+    ops::Range,
     sync::mpsc::{channel, Receiver},
     time::Duration,
 };
 
 use iced::{
-    event, executor,
-    keyboard::Event,
-    widget::scrollable,
-    widget::Button,
-    widget::Column,
-    widget::{self, Text},
-    widget::{mouse_area, Space},
-    widget::{tooltip, Row},
-    widget::{Container, TextInput},
+    event,
+    keyboard::{key::Named, Event, Key},
+    widget::{
+        self, checkbox, container, mouse_area, radio, rich_text, scrollable, span, text, tooltip, Button, Column, Container, Row, Space, Text,
+        TextInput,
+    },
     window::icon,
-    Application, Color, Command, Element, Length, Settings, Subscription, Theme,
+    Color, Element, Font, Length, Subscription, Task, Theme,
 };
 
+use iced_core::{text::Span, window};
 use librusl::{
     fileinfo::FileInfo,
     manager::{Manager, SearchResult},
+    options::FTypes,
     search::Search,
 };
 
@@ -36,6 +36,7 @@ struct App {
     message: String,
     found: usize,
     searching: bool,
+    show_settings: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -48,33 +49,42 @@ pub enum Message {
     CheckExternal,
     Event(iced::event::Event),
     CopyToClipboard(Vec<String>),
+    ToggleSettings,
+    Settings(SettingsMessage),
+}
+#[derive(Debug, Clone)]
+pub enum SettingsMessage {
+    NameCaseSensitive,
+    NameSameFilesystem,
+    NameIgnoreHidden,
+    NameUseGitignore,
+    NameFollowSymlinks,
+    ContentCaseSensitive,
+    ContentExtendedFiletypes,
+    ContentLiteralMatch,
+    NameType(FTypes),
 }
 
 pub fn main() {
-    let mut sets = Settings::<()> {
-        default_text_size: iced::Pixels::from(18.),
-        // default_font: Font::MONOSPACE,
-        antialiasing: true,
-        ..Default::default()
-    };
-
     let image = image::load_from_memory_with_format(include_bytes!("icons/icon.png"), image::ImageFormat::Png)
         .unwrap()
         .into_rgba8();
     let (wid, hei) = image.dimensions();
     let icon = image.into_raw();
-    sets.window.icon = Some(icon::from_rgba(icon, wid, hei).unwrap());
 
-    App::run(sets).unwrap();
+    iced::application(App::title, App::update, App::view)
+        .theme(|_| Theme::TokyoNight)
+        .subscription(App::subscription)
+        .window(window::Settings {
+            icon: Some(icon::from_rgba(icon, wid, hei).unwrap()),
+            ..Default::default()
+        })
+        .run_with(App::new)
+        .expect("Could not run app");
 }
 
-impl Application for App {
-    type Message = Message;
-    type Executor = executor::Default;
-    type Theme = Theme;
-    type Flags = ();
-
-    fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
+impl App {
+    fn new() -> (Self, Task<Message>) {
         let (s, r) = channel();
         let man = Manager::new(s);
 
@@ -88,6 +98,7 @@ impl Application for App {
             receiver: r,
             found: 0,
             searching: false,
+            show_settings: false,
         };
         (d, widget::focus_next())
     }
@@ -96,7 +107,7 @@ impl Application for App {
         "rusl".into()
     }
 
-    fn view(&self) -> Element<Self::Message> {
+    fn view(&self) -> Element<Message> {
         let name = TextInput::new("Find file name", &self.name)
             .padding(4)
             .on_input(Message::NameChanged)
@@ -113,33 +124,89 @@ impl Application for App {
             )
         };
         let dir = TextInput::new("", &self.directory).on_input(Message::DirectoryChanged).padding(4);
+
         let res = Column::with_children(
             self.results
                 .iter()
                 .map(|x| {
                     let max = 100;
                     let maxlen = 200;
-                    let mut content = x.content(max, maxlen);
-                    if x.matches.len() > max {
-                        content.push_str(&format!("\nand {} other lines", x.matches.len() - max));
+
+                    let mut rts = vec![];
+                    let mut start = 0;
+                    //directory
+                    rts.push(span(&x.path[0..x.path.len() - &x.name.len()]));
+                    for r in &x.ranges {
+                        //if not in range, print up to range
+                        if start < r.start {
+                            rts.push(span(&x.name[start..r.start]));
+                        }
+                        //now print the range
+                        rts.push({
+                            let mut font = Font::default();
+                            font.weight = iced::font::Weight::Bold;
+                            span(&x.name[r.start..r.end]).color(Color::from_rgb8(200, 100, 100)).font(font)
+                        });
+                        start = r.end;
                     }
-                    let file = tooltip::Tooltip::new(
-                        mouse_area(Text::new(&x.path).style(Color::from_rgb8(100, 200, 100)))
-                            .on_press(Message::CopyToClipboard(vec![x.path.clone()])),
-                        "Click to copy path to clipboard",
+                    if start < x.name.len() {
+                        rts.push(span(&x.name[start..]));
+                    }
+                    let rt = rich_text(rts);
+                    let icon = if x.path.starts_with("...") {
+                        text!("")
+                    } else if x.is_folder {
+                        text!("D")
+                    } else {
+                        text!("F")
+                    }; //does not support unicode yet
+
+                    let icon = tooltip(
+                        mouse_area(icon).on_press(Message::CopyToClipboard(vec![x.path.clone()])),
+                        container("Click to copy path to clipboard").padding(10).style(container::rounded_box),
                         tooltip::Position::Right,
                     );
 
-                    let mut col = Column::new().push(file);
-                    if !content.is_empty() {
-                        let details = Text::new(content).width(Length::Fill);
-                        col = col.push(details);
+                    let row = Row::new().spacing(10).push(icon).push(rt);
+
+                    let mut col = Column::new().push(row);
+
+                    //content matches
+                    for cline in x.matches.iter().take(max) {
+                        let mut cspans = vec![span(format!("{}: ", cline.line)).color(Color::from_rgb8(17, 122, 13))];
+                        let mut last = 0;
+                        //careful of char boudaries
+                        let mut cutoff = cline.content.len().min(maxlen);
+                        while cutoff > 0 && cutoff != cline.content.len() && !cline.content.is_char_boundary(cutoff) {
+                            cutoff -= 1;
+                        }
+                        let text = &cline.content[..cutoff];
+
+                        for range in &cline.ranges {
+                            if range.start > text.len() || range.end > text.len() {
+                                break;
+                            }
+                            cspans.push(span(text[last..range.start].to_owned()).color(Color::from_rgb8(200, 200, 200)));
+                            cspans.push(span(text[range.start..range.end].to_owned()).color(Color::from_rgb8(255, 0, 0)));
+                            last = range.end;
+                        }
+                        cspans.push(span(text[last..].to_string()).color(Color::from_rgb8(200, 200, 200)));
+                        let content = rich_text(cspans);
+                        col = col.push(content);
                     }
+                    if x.matches.len() > max {
+                        col = col.push(Text::new(format!("... and {} more", x.matches.len() - max)).color(Color::from_rgb8(200, 200, 200)));
+                    }
+                    // if !content.is_empty() {
+                    //     let details = Text::new(content).width(Length::Fill).color(Color::from_rgb8(200, 200, 200));
+                    //     col = col.push(details);
+                    // }
                     Row::new().spacing(10).push(col).into()
                 })
-                .collect(),
+                .collect::<Vec<_>>(),
         );
-        let res = scrollable::Scrollable::new(res);
+
+        let res = scrollable(res);
         Column::new()
             .padding(10)
             .spacing(10)
@@ -165,7 +232,67 @@ impl Application for App {
             .push(
                 Row::new()
                     .spacing(15)
-                    .align_items(iced::Alignment::End)
+                    .push(Button::new(Text::new("Settings")).on_press(Message::ToggleSettings))
+                    .push_maybe(if self.show_settings {
+                        let ops = self.manager.get_options();
+                        Some(
+                            Column::new()
+                                .push(text("Name settings"))
+                                .push(
+                                    checkbox("Case sensitive", ops.name.case_sensitive)
+                                        .on_toggle(|_| Message::Settings(SettingsMessage::NameCaseSensitive)),
+                                )
+                                .push(
+                                    checkbox("Same filesystem", ops.name.same_filesystem)
+                                        .on_toggle(|_| Message::Settings(SettingsMessage::NameSameFilesystem)),
+                                )
+                                .push(
+                                    checkbox("Ignore hidden", ops.name.ignore_dot)
+                                        .on_toggle(|_| Message::Settings(SettingsMessage::NameIgnoreHidden)),
+                                )
+                                .push(
+                                    checkbox("Use gitignore", ops.name.use_gitignore)
+                                        .on_toggle(|_| Message::Settings(SettingsMessage::NameUseGitignore)),
+                                )
+                                .push(
+                                    checkbox("Follow links", ops.name.follow_links)
+                                        .on_toggle(|_| Message::Settings(SettingsMessage::NameFollowSymlinks)),
+                                )
+                                .push(
+                                    Row::new()
+                                        .push(radio("All", FTypes::All, Some(ops.name.file_types), |_| {
+                                            Message::Settings(SettingsMessage::NameType(FTypes::All))
+                                        }))
+                                        .push(radio("Files", FTypes::Files, Some(ops.name.file_types), |_| {
+                                            Message::Settings(SettingsMessage::NameType(FTypes::Files))
+                                        }))
+                                        .push(radio("Folders", FTypes::Directories, Some(ops.name.file_types), |_| {
+                                            Message::Settings(SettingsMessage::NameType(FTypes::Directories))
+                                        }))
+                                        .spacing(10),
+                                )
+                                .push(text("Content settings"))
+                                .push(
+                                    checkbox("Case sensitive", ops.content.case_sensitive)
+                                        .on_toggle(|_| Message::Settings(SettingsMessage::ContentCaseSensitive)),
+                                )
+                                .push(
+                                    checkbox("Extended file types", ops.content.extended)
+                                        .on_toggle(|_| Message::Settings(SettingsMessage::ContentExtendedFiletypes)),
+                                )
+                                .push(
+                                    checkbox("Literal match (non regex)", ops.content.nonregex)
+                                        .on_toggle(|_| Message::Settings(SettingsMessage::ContentLiteralMatch)),
+                                ),
+                        )
+                    } else {
+                        None
+                    }),
+            )
+            .push(
+                Row::new()
+                    .spacing(15)
+                    //.align_items(iced::Alignment::End)
                     .push(if self.searching {
                         Button::new(Text::new("Stop")).on_press(Message::FindPressed)
                     } else {
@@ -177,7 +304,7 @@ impl Application for App {
             .push(res)
             .into()
     }
-    fn update(&mut self, message: Self::Message) -> Command<Message> {
+    fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::FindPressed => {
                 if self.searching {
@@ -238,7 +365,7 @@ impl Application for App {
                     }
                 }
                 if let Err(std::sync::mpsc::TryRecvError::Disconnected) = self.receiver.try_recv() {
-                    return Command::none();
+                    return Task::none();
                 }
             }
             Message::OpenDirectory => {
@@ -247,8 +374,9 @@ impl Application for App {
                 }
             }
             Message::Event(iced::Event::Keyboard(Event::KeyPressed {
-                key_code: iced::keyboard::KeyCode::Tab,
                 modifiers,
+                key: Key::Named(Named::Tab),
+                ..
             })) => {
                 return if modifiers.shift() {
                     widget::focus_previous()
@@ -260,19 +388,35 @@ impl Application for App {
                 self.manager.save_and_quit();
             }
 
-            Message::Event(_) => {}
             Message::CopyToClipboard(str) => {
                 self.manager.export(str);
                 self.message = "Copied to clipboard".to_string();
             }
+            Message::ToggleSettings => {
+                self.show_settings = !self.show_settings;
+            }
+            Message::Settings(ms) => {
+                let mut ops = self.manager.get_options().clone();
+                match ms {
+                    SettingsMessage::NameCaseSensitive => ops.name.case_sensitive = !ops.name.case_sensitive,
+                    SettingsMessage::NameSameFilesystem => ops.name.same_filesystem = !ops.name.same_filesystem,
+                    SettingsMessage::ContentCaseSensitive => ops.content.case_sensitive = !ops.content.case_sensitive,
+                    SettingsMessage::NameIgnoreHidden => ops.name.ignore_dot = !ops.name.ignore_dot,
+                    SettingsMessage::NameUseGitignore => ops.name.use_gitignore = !ops.name.use_gitignore,
+                    SettingsMessage::NameFollowSymlinks => ops.name.follow_links = !ops.name.follow_links,
+                    SettingsMessage::NameType(nt) => ops.name.file_types = nt,
+                    SettingsMessage::ContentLiteralMatch => ops.content.nonregex = !ops.content.nonregex,
+                    SettingsMessage::ContentExtendedFiletypes => ops.content.extended = !ops.content.extended,
+                }
+                self.manager.set_options(ops);
+            }
+            Message::Event(_) => {}
         }
 
-        Command::none()
+        Task::none()
     }
-    fn theme(&self) -> Theme {
-        Theme::Dark
-    }
-    fn subscription(&self) -> iced::Subscription<Self::Message> {
+
+    fn subscription(&self) -> iced::Subscription<Message> {
         Subscription::batch(vec![
             //keep looking for external messages.
             //this is a hack and polls receiver.
