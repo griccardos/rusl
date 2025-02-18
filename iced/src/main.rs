@@ -1,7 +1,6 @@
 //hide windows console
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::{
-    ops::Range,
     sync::mpsc::{channel, Receiver},
     time::Duration,
 };
@@ -10,14 +9,14 @@ use iced::{
     event,
     keyboard::{key::Named, Event, Key},
     widget::{
-        self, checkbox, container, mouse_area, radio, rich_text, scrollable, span, text, tooltip, Button, Column, Container, Row, Space, Text,
-        TextInput,
+        self, checkbox, container, mouse_area, radio, rich_text, scrollable, span, text, text::Span, tooltip, Button, Column, Container, Row, Space,
+        Text, TextInput,
     },
-    window::icon,
+    window::{self, icon},
     Color, Element, Font, Length, Subscription, Task, Theme,
 };
 
-use iced_core::{text::Span, window};
+//use iced_core::{text::Span, window};
 use librusl::{
     fileinfo::FileInfo,
     manager::{Manager, SearchResult},
@@ -131,7 +130,7 @@ impl App {
                     let max = 100;
                     let maxlen = 200;
 
-                    let mut rts = vec![];
+                    let mut rts: Vec<Span> = vec![];
                     let mut start = 0;
                     //directory
                     rts.push(span(&x.path[0..x.path.len() - &x.name.len()]));
@@ -172,7 +171,7 @@ impl App {
 
                     //content matches
                     for cline in x.matches.iter().take(max) {
-                        let mut cspans = vec![span(format!("{}: ", cline.line)).color(Color::from_rgb8(17, 122, 13))];
+                        let mut cspans: Vec<Span> = vec![span(format!("{}: ", cline.line)).color(Color::from_rgb8(17, 122, 13))];
                         let mut last = 0;
                         //careful of char boudaries
                         let mut cutoff = cline.content.len().min(maxlen);
