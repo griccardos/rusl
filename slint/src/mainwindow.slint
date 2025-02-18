@@ -1,9 +1,13 @@
 import{LineEdit,CheckBox,ListView,ComboBox,TabWidget,StandardButton ,TextEdit,Button } from "std-widgets.slint";
 
+export struct MatchInfo{
+    content:string,
+    line:string,
+ }
 export struct SFileInfo {
     pre:string,
     name:string,
-    data:string
+     data:[MatchInfo]
  }
 
 export component MainWindow inherits Window {

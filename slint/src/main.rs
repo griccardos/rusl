@@ -240,25 +240,33 @@ fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, fin
                     content.push_str(&format!("\nand {} other lines", x.matches.len() - max_count));
                 };
 
-                let pre = match (is_content_search, is_linux, x.is_folder) {
+                let pre = match (is_content_search, ops, x.is_folder) {
                     (true, _, _) => "",
-                    (false, true, true) => "🗁",
-                    (false, true, false) => " 🗏 ",
-                    (false, false, true) => "📁",
-                    (false, false, false) => "📝",
+                    (false, "linux", true) => "🗁",
+                    (false, "linux", false) => " 🗏 ",
+                    (false, _, true) => "📁",
+                    (false, _, false) => "📝",
                 };
+                let data = x
+                    .matches
+                    .iter()
+                    .map(|mat| MatchInfo {
+                        content: FileInfo::limited_match(mat, max_len, false).into(),
+                        line: format!("{}:", mat.line).into(),
+                    })
+                    .collect::<Vec<_>>();
 
                 SFileInfo {
                     pre: pre.into(),
                     name: x.path.clone().into(),
-                    data: content.into(),
+                    data: data[..].into(),
                 }
             })
             .collect();
         if count > 1000 {
             sfiles.push(SFileInfo {
                 pre: "".into(),
-                data: "".into(),
+                data: [].into(),
                 name: format!("...and {} others", count - 1000).into(),
             });
         }
