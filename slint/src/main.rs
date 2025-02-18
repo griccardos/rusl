@@ -42,7 +42,12 @@ pub fn main() {
         let mut counter = 0;
         let mut last_update = Instant::now();
         loop {
-            match result_receiver.recv().unwrap() {
+            let rec = result_receiver.recv();
+            if rec.is_err() {
+                break;
+            }
+            let rec = rec.unwrap();
+            match rec {
                 SearchResult::FinalResults(res) => {
                     set_data(weak.clone(), res.data.iter().map(|x| x.to_owned()).collect(), res.duration, true);
                     current.clear();
@@ -217,10 +222,10 @@ fn set_data(weak: Weak<MainWindow>, files: Vec<FileInfo>, elapsed: Duration, fin
         let count = files.len() as i32;
         let max_count = 1000;
         let max_len = 400;
-        let is_content_search = weak.get_content_find_text().len() != 0;
-        let ops = if cfg!(linux) {
+        let is_content_search = !weak.get_content_find_text().is_empty();
+        let ops = if cfg!(target_os = "linux") {
             "linux"
-        } else if cfg!(windows) {
+        } else if cfg!(target_os = "windows") {
             "windows"
         } else {
             "mac"

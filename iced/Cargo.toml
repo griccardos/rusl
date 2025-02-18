@@ -1,16 +1,15 @@
 [package]
 name = "rusl"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 build = "build.rs"
 
 [dependencies]
 librusl={path="../librusl"}
-rfd = "0.14" #for selecting directory for gui
+rfd = "0" #for selecting directory for gui
 iced = { git= "https://github.com/iced-rs/iced", features = ["debug", "tokio"],rev="4b33a45" }#gui
  # iced = {version="0.12", features = ["debug", "smol"] }#gui
-image = "0.24.7"#for icon
+image = "0"#for icon
 
 [build-dependencies]
 embed-resource="2.3.0" #for icon
-
