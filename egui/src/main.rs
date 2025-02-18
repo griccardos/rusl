@@ -23,7 +23,7 @@ pub fn main() {
         viewport: ViewportBuilder::default().with_icon(load_icon()),
         ..Default::default()
     };
-    eframe::run_native("rusl", native_options, Box::new(|cc| Box::new(AppState::new(cc)))).expect("Could not run");
+    eframe::run_native("rusl", native_options, Box::new(|cc| Ok(Box::new(AppState::new(cc))))).expect("Could not run");
 }
 fn load_icon() -> egui::IconData {
     let (icon_rgba, icon_width, icon_height) = {
@@ -215,10 +215,8 @@ impl AppState {
                             self.last_id = results.id;
                             self.message = format!("Found {} results in {:.2}s", results.data.len(), results.duration.as_secs_f64());
                         }
-                    } else {
-                        if let Ok(interim) = self.interim.try_lock() {
-                            self.draw_fileinfos(&interim, ui);
-                        }
+                    } else if let Ok(interim) = self.interim.try_lock() {
+                        self.draw_fileinfos(&interim, ui);
                     }
                 }
             });

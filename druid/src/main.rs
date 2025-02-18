@@ -7,13 +7,17 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(windows)]
+use druid::HasRawWindowHandle;
+
 use druid::{
     im::Vector,
     text::{Attribute, RichText, RichTextBuilder},
     widget::{Button, Checkbox, Controller, Either, Flex, Label, List, RadioGroup, RawLabel, Scroll, SizedBox, TextBox},
-    AppDelegate, AppLauncher, Code, Color, Command, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, HasRawWindowHandle, Lens, Selector,
-    Target, Widget, WidgetExt, WindowDesc,
+    AppDelegate, AppLauncher, Code, Color, Command, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, Lens, Selector, Target, Widget,
+    WidgetExt, WindowDesc,
 };
+
 use regex::{Regex, RegexBuilder};
 
 use librusl::{
@@ -474,6 +478,7 @@ impl AppDelegate<AppState> for Delegate {
     /// Sets the window icon at runtime.
     ///
     /// Once Druid supports this natively, this function can be scrapped.
+
     #[cfg(windows)]
     fn window_added(&mut self, _id: druid::WindowId, handle: druid::WindowHandle, _data: &mut AppState, _env: &Env, _ctx: &mut druid::DelegateCtx) {
         use druid::RawWindowHandle;

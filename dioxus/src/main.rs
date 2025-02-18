@@ -1,24 +1,27 @@
 //hide windows console
 #![windows_subsystem = "windows"]
 
-use std::{cell::RefCell, sync::mpsc, time::Duration};
+use std::{sync::mpsc, time::Duration};
 
-use dioxus::prelude::*;
-
-use dioxus_desktop::{tao::window::Icon, Config, WindowBuilder};
+//use dioxus_desktop::{tao::window::Icon, Config, WindowBuilder};
+use dioxus::{
+    desktop::{tao::window::Icon, WindowBuilder},
+    prelude::*,
+};
 use librusl::{fileinfo::FileInfo, manager::Manager, search::Search};
-
 pub fn main() {
     let mut html = include_str!("../index.html").to_string();
     html = html.replace("CUSTOM_CSS", include_str!("../mui.min.css"));
     html = html.replace("CUSTOM_JS", include_str!("../mui.min.js"));
 
-    dioxus_desktop::launch_cfg(
-        app,
-        Config::new()
-            .with_window(WindowBuilder::new().with_title("rusl").with_window_icon(Some(load_icon())))
-            .with_custom_index(html),
-    );
+    LaunchBuilder::new()
+        .with_cfg(
+            dioxus::desktop::Config::new()
+                .with_menu(None)
+                .with_window(WindowBuilder::new().with_title("rusl").with_window_icon(Some(load_icon())))
+                .with_custom_index(html),
+        )
+        .launch(app);
 }
 
 fn load_icon() -> Icon {
@@ -31,33 +34,33 @@ fn load_icon() -> Icon {
 
     Icon::from_rgba(icon_rgba, icon_width, icon_height).unwrap()
 }
-
-fn app(cx: Scope<()>) -> Element {
-    let text_name = use_state(&cx, || "".to_string());
-    let text_contents = use_state(&cx, || "".to_string());
-    let text_dir = use_state(&cx, || ".".to_string());
-    let message = use_state(&cx, || "".to_string());
-    let data = use_state(&cx, || RefCell::new(Vec::<FileInfo>::new()));
+fn app() -> Element {
+    let mut text_name = use_signal(|| "".to_string());
+    let mut text_contents = use_signal(|| "".to_string());
+    let mut text_dir = use_signal(|| ".".to_string());
+    let mut message = use_signal(|| "".to_string());
+    let data = use_signal(|| Vec::<FileInfo>::new());
     let (s, r) = mpsc::channel();
-    let man = use_ref(&cx, || Manager::new(s));
-    let count = use_state(cx, || 0);
+    let mut man = use_signal(|| Manager::new(s));
+    let count = use_signal(|| 0);
+    let r = use_signal(|| r);
 
     //run in background
     // loop, if find then output, else sleep for a while
-    use_coroutine(&cx, |_: UnboundedReceiver<()>| {
-        let data = data.clone();
-        let message = message.clone();
-        let count = count.clone();
+    use_coroutine(move |_: UnboundedReceiver<()>| {
+        let mut data = data.clone();
+        let mut message = message.clone();
+        let mut count = count.clone();
         async move {
             loop {
-                match r.try_recv() {
+                match r.read().try_recv() {
                     Ok(files) => {
                         match files {
                             librusl::manager::SearchResult::FinalResults(fe) => {
                                 eprintln!("Found {}", fe.data.len());
-                                let current = data.current();
-                                let mut mutable = current.borrow_mut();
-                                mutable.clear();
+                                let current = data.clone();
+                                let mut mutable = current.clone();
+                                mutable.write().clear();
                                 let found_count = fe.data.len();
                                 if found_count < 1000 {
                                     mutable.extend(fe.data);
@@ -76,11 +79,11 @@ fn app(cx: Scope<()>) -> Element {
                                 message.set(format!("Found {} in {:.2}s", found_count, fe.duration.as_secs_f32()));
                             }
                             librusl::manager::SearchResult::InterimResult(ir) => {
-                                count.set(*count.current() + 1);
+                                let c = *count.read();
+                                count.set(c + 1);
 
-                                let current = data.current();
-                                let mut mutable = current.borrow_mut();
-                                let mes = format!("Found {}, searching...", count.current());
+                                let mut mutable = data.write();
+                                let mes = format!("Found {}, searching...", count.read());
                                 //eprintln!("{mes}");
                                 message.set(mes);
 
@@ -111,9 +114,9 @@ fn app(cx: Scope<()>) -> Element {
         }
     });
 
-    cx.render(rsx!(
+    rsx!(
 
-        div {
+
 
             //toolbar
             div { style: "background-color:#404040;padding:10px;",
@@ -124,7 +127,7 @@ fn app(cx: Scope<()>) -> Element {
                         value: "{text_name}",
                         placeholder: "Regex file name search e.g. ^mai.*rs$ or r.st or ^best",
                         oninput: move |evt| {
-                            let newval = evt.value.clone();
+                            let newval = evt.value().clone();
                             text_name.set(newval);
                         }
                     }
@@ -136,7 +139,7 @@ fn app(cx: Scope<()>) -> Element {
                         value: "{text_contents}",
                         placeholder: "Regex content search e.g. str.{2}g",
                         oninput: move |evt| {
-                            let newval = evt.value.clone();
+                            let newval = evt.value().clone();
                             text_contents.set(newval);
                         }
                     }
@@ -147,7 +150,7 @@ fn app(cx: Scope<()>) -> Element {
                         style: "color:lightgray;",
                         value: "{text_dir}",
                         oninput: move |evt| {
-                            let newval = evt.value.clone();
+                            let newval = evt.value().clone();
                             text_dir.set(newval);
                         }
                     }
@@ -158,7 +161,7 @@ fn app(cx: Scope<()>) -> Element {
                     button {
                         class: "mui-btn mui-btn--primary mui-btn--raised",
                         onclick: move |_| {
-                            if text_name.is_empty() {
+                            if text_name.read().is_empty() {
                                 message.set("Nothing to search for".to_string());
                             } else {
                                 message.set("Searching".to_string());
@@ -179,19 +182,20 @@ fn app(cx: Scope<()>) -> Element {
                 }
             }
 
+
+            div {
+
             //results
-            div { style: "padding:10px",
-                data.current().borrow().iter().map(|x|
-                    {
-                        rsx!(
+            div { for x in  data.read().iter()      {
+
                     div{
                         label{
-                            style:if text_contents.is_empty(){""}else{ "color:blue;font-weight:bold"},
+                            style:if text_contents.read().is_empty(){""}else{ "color:blue;font-weight:bold"},
                             "{x.path}"
                         },
                     }
                     for mat in &x.matches{
-                        rsx!(
+
                             div{
                             label{
                                 style:"color:darkgreen;font-weight:bold",
@@ -200,16 +204,16 @@ fn app(cx: Scope<()>) -> Element {
 
                             label{"{limit_len(&mat.content, 100)}"},
                         }
-                        )
+
                     }
 
-                        )
+
 
             }
-            )
+
             }
         }
-    ))
+    )
 }
 
 fn limit_len(s: &str, max: usize) -> &str {

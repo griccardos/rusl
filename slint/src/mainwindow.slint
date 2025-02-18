@@ -260,32 +260,40 @@ export component MainWindow inherits Window {
                 alignment: start;
                 width: parent.width -20px;
 
-                VerticalLayout { 
-                    padding: 2px;
-                    HorizontalLayout { 
-                        if f.pre!="":
-                    Text{
-                        width: 40px;
-                        text:f.pre;
-                        color: white; 
-                    }
-                    Text{
-                        text:f.name;
-                        color: rgb(58, 150, 221); 
-                        overflow: elide;
+                        VerticalLayout {
+                            padding: 2px;
+                            HorizontalLayout {
+                                if f.pre != "":
+                                    Text {
+                                    width: 40px;
+                                    text: f.pre;
+                                    color: white;
+                                }
+                                Text {
+                                    text: f.name;
+                                    color: rgb(58, 150, 221);
+                                    overflow: elide;
+                                }
+                            }
+
+                            for m in f.data: HorizontalLayout {
+                                padding: 2px;
+                                Text {
+                                    
+                                    text: m.line;
+                                    color: green;
+                                }
+
+                                Text {
+                                    text: m.content;
+                                    color: rgb(164,164,164);
+                                    overflow: elide;
+                                }
+                            }
+                        }
                     }
                 }
-                    if f.data!="":
-                    Text{
-                        text:f.data;
-                        color: rgb(164,164,164); 
-                        overflow: elide;
-                    }
-                }
-                }
-                
+            }
         }
     }
-    }
-    }
-    }
+}

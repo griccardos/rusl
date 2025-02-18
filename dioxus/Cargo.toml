@@ -1,6 +1,6 @@
 [package]
 name = "rusl"
-version = "0.1.7"
+version = "0.1.9"
 edition = "2021"
 build = "build.rs"
 
@@ -8,15 +8,12 @@ build = "build.rs"
 
 [dependencies]
 librusl = {path="../librusl"}
-dioxus = "0.4"
-tokio = "1.32" #for dioxus
+dioxus = {version = "0.6",features = ["desktop"]}
+tokio = "1" #for dioxus
 futures-channel = "0.3" #for dioxus
-dioxus-desktop = "0.4"
-image = "0.24"
+image = "0"
+crossbeam-channel = "0.5.14"
 
 
 [build-dependencies]
 embed-resource="2.3.0" #for icon
-
-
-
