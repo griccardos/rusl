@@ -1,7 +1,7 @@
 [package]
 name = "rusl"
-version = "0.7.1"
-edition = "2021"
+version = "0.8.1"
+edition = "2024"
 build = "build.rs"
 description = "search gui"
 
@@ -15,7 +15,7 @@ regex = "1"
 winapi = { version = "0.3", features = ["windef"] } #for icon in windows
 
 [build-dependencies]
-winres ="0.1.12"#for icon in windows
+winres ="0"#for icon in windows
 
 #cargo bundle for MacOS
 [package.metadata.bundle]

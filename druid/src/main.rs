@@ -433,6 +433,13 @@ impl AppDelegate<AppState> for Delegate {
 
                     data.message = RichText::new(string.into());
                     data.find_name = "Find".to_string();
+
+                    if data.visible.len() != results.data.len() {
+                        data.visible.clear();
+                        for fi in results.data.iter().take(MAX_NAMES) {
+                            data.visible.push_back(highlight_result(fi, &data.re_content, &data.re_line, 100));
+                        }
+                    }
                 }
                 SearchResult::InterimResult(fi) => {
                     if data.visible.len() < MAX_NAMES {
