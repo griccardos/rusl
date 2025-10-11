@@ -1,15 +1,15 @@
 [package]
 name = "rusl"
-version = "0.2.1"
-edition = "2021"
+version = "0.3.0"
+edition = "2024"
 build = "build.rs"
 
 
 [dependencies]
-librusl={path="../librusl"}
-rfd = "0" #for selecting directory for gui
-eframe = "0" #egui
-image = "0" #for titlebar icon
+librusl = { path = "../librusl" }
+rfd = "0"                         #for selecting directory for gui
+eframe = "0"                      #egui
+image = "0"                       #for titlebar icon
 
 [build-dependencies]
-embed-resource="2.4" #for icon
+embed-resource = "3.0" #for icon

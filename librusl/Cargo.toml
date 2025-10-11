@@ -5,15 +5,14 @@ edition = "2024"
 description = "main rusl library"
 
 [dependencies]
-regex =  "1" # for pattern matching
-num_cpus = "1" # for parallel search
-grep =  "0" #ripgrep
-ignore = "0" #parallel walker from ripgrep
-walkdir = "2" #walker from ripgrep
-clipboard = "0.5" #for clipboard
-dirs = "6" #for getting config file
-serde = { version="1.0", features=["derive"]}  #save config
-toml = "0.8" #config format
-termcolor = "1" #unly used for grep to get nocolor
-pdf-extract= "0" # for pdf
-dotext = "0" # for office docs
+regex = "1"                                        # for pattern matching
+num_cpus = "1.17"                                  # for parallel search
+grep = "0"                                         #ripgrep
+ignore = "0.4"                                     #parallel walker from ripgrep
+walkdir = "2"                                      #walker from ripgrep
+dirs = "6"                                         #for getting config file
+serde = { version = "1.0", features = ["derive"] } #save config
+toml = "0.9"                                       #config format
+termcolor = "1.4"                                  #unly used for grep to get nocolor
+pdf-extract = "0.10"                               # for pdf
+markdownify = "0.2.1"                              # for other docs

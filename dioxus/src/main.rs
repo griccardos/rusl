@@ -5,11 +5,13 @@ use std::{sync::mpsc, time::Duration};
 
 //use dioxus_desktop::{tao::window::Icon, Config, WindowBuilder};
 use dioxus::{
-    desktop::{tao::window::Icon, WindowBuilder},
+    desktop::{WindowBuilder, tao::window::Icon},
     prelude::*,
 };
 use librusl::{fileinfo::FileInfo, manager::Manager, search::Search};
 pub fn main() {
+    println!("run with `WEBKIT_DISABLE_DMABUF_RENDERER=1` if you have problems on linux wayland");
+
     let mut html = include_str!("../index.html").to_string();
     html = html.replace("CUSTOM_CSS", include_str!("../mui.min.css"));
     html = html.replace("CUSTOM_JS", include_str!("../mui.min.js"));

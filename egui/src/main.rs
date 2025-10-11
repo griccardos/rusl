@@ -105,7 +105,7 @@ impl AppState {
 
     fn menu(&mut self, _frame: &mut eframe::Frame, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("Quit").clicked() {
                         self.manager.save_and_quit();
@@ -153,8 +153,9 @@ impl AppState {
             ui.label(&self.message);
             ui.add_space(40.0);
             if ui.button("Clipboard").on_hover_text("Save to clipboard").clicked() {
-                self.manager
-                    .export(self.results.lock().unwrap().data.iter().map(|x| x.path.to_string()).collect());
+                /*  self.manager
+                .export(self.results.lock().unwrap().data.iter().map(|x| x.path.to_string()).collect());
+                */
             }
             if ui
                 .button((if self.show_settings { "Show results" } else { "Show settings" }).to_string())
@@ -249,27 +250,29 @@ fn spawn_receiver(
     interim: Arc<Mutex<Vec<FileInfo>>>,
     context: egui::Context,
 ) {
-    thread::spawn(move || loop {
-        match rx.recv() {
-            Ok(rec) => match rec {
-                SearchResult::FinalResults(res) => {
-                    let mut res_self = results_thread.lock().unwrap();
-                    if res.id > res_self.id {
-                        res_self.data = res.data;
-                        res_self.duration = res.duration;
-                        res_self.id = res.id;
-                        context.request_repaint();
+    thread::spawn(move || {
+        loop {
+            match rx.recv() {
+                Ok(rec) => match rec {
+                    SearchResult::FinalResults(res) => {
+                        let mut res_self = results_thread.lock().unwrap();
+                        if res.id > res_self.id {
+                            res_self.data = res.data;
+                            res_self.duration = res.duration;
+                            res_self.id = res.id;
+                            context.request_repaint();
+                        }
                     }
+                    SearchResult::InterimResult(fi) => {
+                        //this is to show interim results as they are received
+                        interim.lock().unwrap().push(fi);
+                    }
+                    SearchResult::SearchErrors(_) => { /*todo show errors*/ }
+                    SearchResult::SearchCount(_) => {}
+                },
+                Err(err) => {
+                    eprintln!("Error: {err:?}:{err}")
                 }
-                SearchResult::InterimResult(fi) => {
-                    //this is to show interim results as they are received
-                    interim.lock().unwrap().push(fi);
-                }
-                SearchResult::SearchErrors(_) => { /*todo show errors*/ }
-                SearchResult::SearchCount(_) => {}
-            },
-            Err(err) => {
-                eprintln!("Error: {err:?}:{err}")
             }
         }
     });

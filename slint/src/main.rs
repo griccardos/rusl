@@ -156,14 +156,14 @@ pub fn main() {
 
     //exports
     let results_export_paths = results.clone();
-    let manager_export = manager.clone();
     mw.on_export(move |typ: i32| {
         let results = results_export_paths.lock().unwrap();
-        let results: Vec<String> = match typ.into() {
+        let _results: Vec<String> = match typ.into() {
             ExportType::FullPath => results.iter().map(|x| x.path.clone()).collect(),
             ExportType::Name => results.iter().map(|x| x.name.clone()).collect(),
         };
-        manager_export.lock().unwrap().export(results);
+
+        //manager_export.lock().unwrap().export(results);
     });
 
     //dirchange

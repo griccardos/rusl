@@ -9,8 +9,11 @@ use iced::{
     event,
     keyboard::{key::Named, Event, Key},
     widget::{
-        self, checkbox, container, mouse_area, radio, rich_text, scrollable, span, text, text::Span, tooltip, Button, Column, Container, Row, Space,
-        Text, TextInput,
+        checkbox, container, mouse_area,
+        operation::{focus_next, focus_previous},
+        radio, rich_text, scrollable, span, text,
+        text::Span,
+        tooltip, Button, Column, Container, Row, Space, Text, TextInput,
     },
     window::{self, icon},
     Color, Element, Font, Length, Subscription, Task, Theme,
@@ -70,14 +73,14 @@ pub fn main() {
     let (wid, hei) = image.dimensions();
     let icon = image.into_raw();
 
-    iced::application(App::title, App::update, App::view)
-        .theme(|_| Theme::TokyoNight)
+    iced::application(App::new, App::update, App::view)
+        .theme(Theme::TokyoNight)
         .subscription(App::subscription)
         .window(window::Settings {
             icon: Some(icon::from_rgba(icon, wid, hei).unwrap()),
             ..Default::default()
         })
-        .run_with(App::new)
+        .run()
         .expect("Could not run app");
 }
 
@@ -98,14 +101,10 @@ impl App {
             searching: false,
             show_settings: false,
         };
-        (d, widget::focus_next())
+        (d, focus_next())
     }
 
-    fn title(&self) -> String {
-        "rusl".into()
-    }
-
-    fn view(&self) -> Element<Message> {
+    fn view(&self) -> Element<'_, Message> {
         let name = TextInput::new("Find file name", &self.name)
             .padding(4)
             .on_input(Message::NameChanged)
@@ -206,87 +205,74 @@ impl App {
 
         let res = scrollable(res);
 
+        let sets = if self.show_settings {
+            let ops = self.manager.get_options();
+            Some(
+                Column::new()
+                    .push(Text::new("Name settings"))
+                    .push(checkbox("Case sensitive", ops.name.case_sensitive).on_toggle(|_| Message::Settings(SettingsMessage::NameCaseSensitive)))
+                    .push(checkbox("Same filesystem", ops.name.same_filesystem).on_toggle(|_| Message::Settings(SettingsMessage::NameSameFilesystem)))
+                    .push(checkbox("Ignore hidden", ops.name.ignore_dot).on_toggle(|_| Message::Settings(SettingsMessage::NameIgnoreHidden)))
+                    .push(checkbox("Use gitignore", ops.name.use_gitignore).on_toggle(|_| Message::Settings(SettingsMessage::NameUseGitignore)))
+                    .push(checkbox("Follow links", ops.name.follow_links).on_toggle(|_| Message::Settings(SettingsMessage::NameFollowSymlinks)))
+                    .push(
+                        Row::new()
+                            .push(radio("All", FTypes::All, Some(ops.name.file_types), |_| {
+                                Message::Settings(SettingsMessage::NameType(FTypes::All))
+                            }))
+                            .push(radio("Files", FTypes::Files, Some(ops.name.file_types), |_| {
+                                Message::Settings(SettingsMessage::NameType(FTypes::Files))
+                            }))
+                            .push(radio("Folders", FTypes::Directories, Some(ops.name.file_types), |_| {
+                                Message::Settings(SettingsMessage::NameType(FTypes::Directories))
+                            }))
+                            .spacing(10),
+                    )
+                    .push(Text::new("Content settings"))
+                    .push(
+                        checkbox("Case sensitive", ops.content.case_sensitive)
+                            .on_toggle(|_| Message::Settings(SettingsMessage::ContentCaseSensitive)),
+                    )
+                    .push(
+                        checkbox("Extended file types", ops.content.extended)
+                            .on_toggle(|_| Message::Settings(SettingsMessage::ContentExtendedFiletypes)),
+                    )
+                    .push(
+                        checkbox("Literal match (non regex)", ops.content.nonregex)
+                            .on_toggle(|_| Message::Settings(SettingsMessage::ContentLiteralMatch)),
+                    ),
+            )
+        } else {
+            None
+        };
+
         Column::new()
             .padding(10)
             .spacing(10)
             .push(
                 Row::new()
                     .push(Text::new("File name").width(Length::Fixed(100.)))
-                    .push(Space::new(iced::Length::Fixed(10.), iced::Length::Shrink))
+                    .push(Space::new().width(Length::Fixed(10.)))
                     .push(name),
             )
             .push(
                 Row::new()
                     .push(Text::new("Contents").width(Length::Fixed(100.)))
-                    .push(Space::new(iced::Length::Fixed(10.), iced::Length::Shrink))
+                    .push(Space::new().width(Length::Fixed(10.)))
                     .push(contents),
             )
             .push(
                 Row::new()
                     .push(Text::new("Directory").width(Length::Fixed(100.)))
                     .push(Button::new(Text::new("+")).on_press(Message::OpenDirectory))
-                    .push(Space::new(iced::Length::Fixed(10.), iced::Length::Shrink))
+                    .push(Space::new().width(Length::Fixed(10.)))
                     .push(dir),
             )
             .push(
                 Row::new()
                     .spacing(15)
                     .push(Button::new(Text::new("Settings")).on_press(Message::ToggleSettings))
-                    .push_maybe(if self.show_settings {
-                        let ops = self.manager.get_options();
-                        Some(
-                            Column::new()
-                                .push(text("Name settings"))
-                                .push(
-                                    checkbox("Case sensitive", ops.name.case_sensitive)
-                                        .on_toggle(|_| Message::Settings(SettingsMessage::NameCaseSensitive)),
-                                )
-                                .push(
-                                    checkbox("Same filesystem", ops.name.same_filesystem)
-                                        .on_toggle(|_| Message::Settings(SettingsMessage::NameSameFilesystem)),
-                                )
-                                .push(
-                                    checkbox("Ignore hidden", ops.name.ignore_dot)
-                                        .on_toggle(|_| Message::Settings(SettingsMessage::NameIgnoreHidden)),
-                                )
-                                .push(
-                                    checkbox("Use gitignore", ops.name.use_gitignore)
-                                        .on_toggle(|_| Message::Settings(SettingsMessage::NameUseGitignore)),
-                                )
-                                .push(
-                                    checkbox("Follow links", ops.name.follow_links)
-                                        .on_toggle(|_| Message::Settings(SettingsMessage::NameFollowSymlinks)),
-                                )
-                                .push(
-                                    Row::new()
-                                        .push(radio("All", FTypes::All, Some(ops.name.file_types), |_| {
-                                            Message::Settings(SettingsMessage::NameType(FTypes::All))
-                                        }))
-                                        .push(radio("Files", FTypes::Files, Some(ops.name.file_types), |_| {
-                                            Message::Settings(SettingsMessage::NameType(FTypes::Files))
-                                        }))
-                                        .push(radio("Folders", FTypes::Directories, Some(ops.name.file_types), |_| {
-                                            Message::Settings(SettingsMessage::NameType(FTypes::Directories))
-                                        }))
-                                        .spacing(10),
-                                )
-                                .push(text("Content settings"))
-                                .push(
-                                    checkbox("Case sensitive", ops.content.case_sensitive)
-                                        .on_toggle(|_| Message::Settings(SettingsMessage::ContentCaseSensitive)),
-                                )
-                                .push(
-                                    checkbox("Extended file types", ops.content.extended)
-                                        .on_toggle(|_| Message::Settings(SettingsMessage::ContentExtendedFiletypes)),
-                                )
-                                .push(
-                                    checkbox("Literal match (non regex)", ops.content.nonregex)
-                                        .on_toggle(|_| Message::Settings(SettingsMessage::ContentLiteralMatch)),
-                                ),
-                        )
-                    } else {
-                        None
-                    }),
+                    .push(sets),
             )
             .push(
                 Row::new()
@@ -306,6 +292,10 @@ impl App {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::FindPressed => {
+                if self.name.is_empty() && self.contents.is_empty() {
+                    self.message = "Nothing to search for".to_string();
+                    return Task::none();
+                }
                 if self.searching {
                     self.manager.stop();
                     self.message = format!("Found {} items. Stopped", self.found);
@@ -377,19 +367,15 @@ impl App {
                 modifiers,
                 ..
             })) => {
-                return if modifiers.shift() {
-                    widget::focus_previous()
-                } else {
-                    widget::focus_next()
-                };
+                return if modifiers.shift() { focus_previous() } else { focus_next() };
             }
             Message::Event(iced::Event::Window(iced::window::Event::CloseRequested)) => {
                 self.manager.save_and_quit();
             }
 
-            Message::CopyToClipboard(str) => {
-                self.manager.export(str);
-                self.message = "Copied to clipboard".to_string();
+            Message::CopyToClipboard(_str) => {
+                // self.manager.export(str);
+                // self.message = "Copied to clipboard".to_string();
             }
             Message::ToggleSettings => {
                 self.show_settings = !self.show_settings;

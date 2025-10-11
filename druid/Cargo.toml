@@ -6,18 +6,20 @@ build = "build.rs"
 description = "search gui"
 
 [dependencies]
-librusl = { path="../librusl"}
-rfd = "0" #for selecting directory for gui
-druid  ={ version = "0.8.3", features = ["im", "raw-win-handle"] } #GUI
-regex = "1" 
+librusl = { path = "../librusl" }
+rfd = "0"                                                          #for selecting directory for gui
+druid = { version = "0.8.3", features = ["im", "raw-win-handle"] } #GUI
+regex = "1"
+clipboard-rs = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["windef"] } #for icon in windows
 
 [build-dependencies]
-winres ="0"#for icon in windows
+winres = "0.1" #for icon in windows
+
 
 #cargo bundle for MacOS
 [package.metadata.bundle]
 identifier = "com.github.griccardos.rusl"
-icon=["src/icons/icon.png"]
+icon = ["src/icons/icon.png"]

@@ -14,8 +14,8 @@ use druid::{
     im::Vector,
     text::{Attribute, RichText, RichTextBuilder},
     widget::{Button, Checkbox, Controller, Either, Flex, Label, List, RadioGroup, RawLabel, Scroll, SizedBox, TextBox},
-    AppDelegate, AppLauncher, Code, Color, Command, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, Lens, Selector, Target, Widget,
-    WidgetExt, WindowDesc,
+    AppDelegate, AppLauncher, Application, Code, Color, Command, Data, Env, Event, EventCtx, FontFamily, FontWeight, Handled, Lens, Selector, Target,
+    Widget, WidgetExt, WindowDesc,
 };
 
 use regex::{Regex, RegexBuilder};
@@ -369,12 +369,15 @@ impl AppDelegate<AppState> for Delegate {
         }
 
         if cmd.is(EXPORT) {
-            self.manager.export(data.data.iter().map(|x| x.to_string()).collect());
+            let data = data.data.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n");
+            Application::global().clipboard().put_string(&data);
+
             ctx.submit_command(Command::new(UPDATEMESSAGE, "Copied to clipboard".to_string(), Target::Auto));
             return Handled::Yes;
         }
         if let Some(line) = cmd.get(EXPORTSINGLE) {
-            self.manager.export(vec![line.clone()]);
+            Application::global().clipboard().put_string(&line);
+
             ctx.submit_command(Command::new(UPDATEMESSAGE, "Copied to clipboard".to_string(), Target::Auto));
 
             return Handled::Yes;

@@ -1,8 +1,6 @@
-use dotext::doc::OpenOfficeDoc;
-use dotext::*;
+use markdownify::docx;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
-use std::io::Read;
 use std::panic::catch_unwind;
 use std::path::Path;
 pub trait ExtendedTrait {
@@ -24,9 +22,12 @@ impl ExtendedTrait for ExtendedType {
             ExtendedType::Office => vec![
                 "docx".to_string(),
                 "xlsx".to_string(),
+                "ods".to_string(),
+                "xls".to_string(),
+                "xlsm".to_string(),
+                "xlsb".to_string(),
                 "pptx".to_string(),
                 "odt".to_string(),
-                // "ods".to_string(),
                 "odp".to_string(),
             ],
         }
@@ -66,33 +67,12 @@ fn extract_pdf(path: &Path) -> Result<String, Box<dyn Error>> {
 
 fn extract_office(path: &Path) -> Result<String, Box<dyn Error>> {
     let ext = path.extension().unwrap_or_default().to_string_lossy().to_string();
-    let mut string = String::new();
-    match ext.as_str() {
-        "docx" => {
-            let mut docx = Docx::open(&path)?;
-            docx.read_to_string(&mut string)?;
-        }
-        "xlsx" => {
-            let mut xlsx = Xlsx::open(&path)?;
-            xlsx.read_to_string(&mut string)?;
-        }
-        "pptx" => {
-            let mut pptx = Pptx::open(&path)?;
-            pptx.read_to_string(&mut string)?;
-        }
-        "odt" => {
-            let mut odt = Odt::open(&path)?;
-            odt.read_to_string(&mut string)?;
-        }
-        // "ods" => {
-        //     let ods = Ods::open(&path)?;
-        //     ods.read_to_string(&mut string)?;
-        // }
-        "odp" => {
-            let mut odp = Odp::open(&path)?;
-            odp.read_to_string(&mut string)?;
-        }
+    let string = match ext.as_str() {
+        "docx" => docx::docx_convert(&path)?,
+        "xlsx" | "ods" | "xls" | "xlsm" | "xlsb" => markdownify::sheets::sheets_convert(&path)?,
+        "pptx" => markdownify::pptx::pptx_converter(&path)?,
+        "odt" | "odp" => markdownify::opendoc::opendoc_convert(&path)?,
         _ => return Err("unknown extension".into()),
-    }
+    };
     Ok(string)
 }
