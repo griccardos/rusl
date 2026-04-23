@@ -8,7 +8,7 @@ build = "build.rs"
 
 [dependencies]
 librusl = { path = "../librusl" }
-dioxus = { version = "0.7.0-rc.1", features = ["desktop"] }
+dioxus = { version = "0.7", features = ["desktop"] }
 tokio = "1"                                                 #for dioxus
 futures-channel = "0.3"                                     #for dioxus
 image = "0"
@@ -17,3 +17,15 @@ crossbeam-channel = "0.5"
 
 [build-dependencies]
 embed-resource = "3.0" #for icon
+
+[profile]
+
+[profile.wasm-dev]
+inherits = "dev"
+opt-level = 1
+
+[profile.server-dev]
+inherits = "dev"
+
+[profile.android-dev]
+inherits = "dev"

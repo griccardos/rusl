@@ -1,6 +1,6 @@
 [package]
 name = "librusl"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2024"
 description = "main rusl library"
 
@@ -12,7 +12,7 @@ ignore = "0.4"                                     #parallel walker from ripgrep
 walkdir = "2"                                      #walker from ripgrep
 dirs = "6"                                         #for getting config file
 serde = { version = "1.0", features = ["derive"] } #save config
-toml = "0.9"                                       #config format
+toml = "1.1.2"                                     #config format
 termcolor = "1.4"                                  #unly used for grep to get nocolor
 pdf-extract = "0.10"                               # for pdf
-markdownify = "0.2.1"                              # for other docs
+markdownify = "0.3.4"                              # for other docs

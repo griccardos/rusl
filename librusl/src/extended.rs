@@ -1,4 +1,3 @@
-use markdownify::docx;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::panic::catch_unwind;
@@ -68,10 +67,10 @@ fn extract_pdf(path: &Path) -> Result<String, Box<dyn Error>> {
 fn extract_office(path: &Path) -> Result<String, Box<dyn Error>> {
     let ext = path.extension().unwrap_or_default().to_string_lossy().to_string();
     let string = match ext.as_str() {
-        "docx" => docx::docx_convert(&path)?,
-        "xlsx" | "ods" | "xls" | "xlsm" | "xlsb" => markdownify::sheets::sheets_convert(&path)?,
-        "pptx" => markdownify::pptx::pptx_converter(&path)?,
-        "odt" | "odp" => markdownify::opendoc::opendoc_convert(&path)?,
+        "docx" => markdownify::docx::parse_docx(&std::fs::read(path)?, true)?,
+        "xlsx" | "ods" | "xls" | "xlsm" | "xlsb" => markdownify::sheets::parse_sheets(&std::fs::read(path)?)?,
+        "pptx" => markdownify::pptx::parse_pptx(&std::fs::read(path)?, true)?,
+        "odt" | "odp" => markdownify::opendoc::parse_opendoc(&std::fs::read(path)?, true)?,
         _ => return Err("unknown extension".into()),
     };
     Ok(string)
