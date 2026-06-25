@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -9,6 +9,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use ignore::WalkBuilder;
+use indexmap::IndexMap;
 
 use crate::extended::ExtendedType;
 use crate::fileinfo::{FileInfo, Match};
@@ -375,7 +376,7 @@ impl Manager {
             .map(|x| x.split(&SEPARATOR).collect::<Vec<&str>>())
             .filter(|x| x.len() == 3)
             .collect();
-        let mut hm: HashMap<String, FileInfo> = HashMap::new();
+        let mut hm: IndexMap<String, FileInfo> = IndexMap::new();
         for f in file_line_content.iter() {
             let (path, extended): (String, Option<ExtendedType>) = match f[0].split_once(EXTENSION_SEPARATOR) {
                 Some((a, b)) => (a.to_string(), Some(b.into())),

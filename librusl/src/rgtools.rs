@@ -14,8 +14,8 @@ use std::{
     io::{Cursor, Write},
     path::Path,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 use termcolor::NoColor;

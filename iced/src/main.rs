@@ -7,12 +7,12 @@ use std::{
 
 use formato::Formato;
 use iced::{
-    Color, Element, Font, Length, Subscription, Task, Theme,
+    Color, Element, Font, Length, Padding, Subscription, Task, Theme,
     alignment::Alignment,
     event,
     keyboard::{Event, Key, key::Named},
     widget::{
-        Button, Column, Container, Row, Space, Text, TextInput, container, mouse_area,
+        Button, Column, Container, Row, Space, Text, TextInput, button, container, mouse_area,
         operation::{focus_next, focus_previous},
         radio, rich_text, scrollable, span, text,
         text::Span,
@@ -26,7 +26,7 @@ use librusl::{
     extended::ExtendedTrait,
     fileinfo::FileInfo,
     manager::{Manager, SearchResult},
-    options::FTypes,
+    options::{FTypes, Sort},
     search::Search,
 };
 
@@ -73,6 +73,7 @@ pub enum SettingsMessage {
     ContentExtendedFiletypes,
     ContentLiteralMatch,
     NameType(FTypes),
+    SortType(Sort),
 }
 
 pub fn main() {
@@ -329,16 +330,41 @@ impl App {
                         .spacing(10),
                 ),
             )
+            .push({
+                let sort = ops.sort;
+                Row::new()
+                    .push(text("Sort Results"))
+                    .push(radio("None", Sort::None, Some(sort), |_| {
+                        Message::Settings(SettingsMessage::SortType(Sort::None))
+                    }))
+                    .push(radio("Path", Sort::Path, Some(sort), |_| {
+                        Message::Settings(SettingsMessage::SortType(Sort::Path))
+                    }))
+                    .push(radio("Name", Sort::Name, Some(sort), |_| {
+                        Message::Settings(SettingsMessage::SortType(Sort::Name))
+                    }))
+                    .push(radio("Ext", Sort::Extension, Some(sort), |_| {
+                        Message::Settings(SettingsMessage::SortType(Sort::Extension))
+                    }))
+                    .spacing(10)
+            })
             .push(Row::new().push(Button::new(Text::new("Settings")).on_press(Message::ToggleSettings)))
             .push(sets)
             .push(
                 Row::new()
                     .spacing(15)
-                    //.align_items(iced::Alignment::End)
+                    .align_y(Alignment::Center)
                     .push(if self.searching {
-                        Button::new(Text::new("Stop")).on_press(Message::FindPressed)
+                        Button::new(Text::new("Stop"))
+                            .width(80)
+                            .padding(Padding::default().horizontal(25).vertical(5))
+                            .on_press(Message::FindPressed)
                     } else {
-                        Button::new(Text::new("Find")).on_press(Message::FindPressed)
+                        Button::new(Text::new("Find"))
+                            .width(80)
+                            .padding(Padding::default().horizontal(25).vertical(5))
+                            .on_press(Message::FindPressed)
+                            .style(|th, st| button::secondary(th, st))
                     })
                     .push(Text::new(&self.message))
                     .push(clipboard),
@@ -535,15 +561,16 @@ impl App {
             Message::Settings(ms) => {
                 let mut ops = self.manager.get_options().clone();
                 match ms {
-                    SettingsMessage::NameCaseSensitive => ops.name.case_sensitive = !ops.name.case_sensitive,
-                    SettingsMessage::NameSameFilesystem => ops.name.same_filesystem = !ops.name.same_filesystem,
                     SettingsMessage::ContentCaseSensitive => ops.content.case_sensitive = !ops.content.case_sensitive,
-                    SettingsMessage::NameIgnoreHidden => ops.name.ignore_dot = !ops.name.ignore_dot,
-                    SettingsMessage::NameUseGitignore => ops.name.use_gitignore = !ops.name.use_gitignore,
-                    SettingsMessage::NameFollowSymlinks => ops.name.follow_links = !ops.name.follow_links,
-                    SettingsMessage::NameType(nt) => ops.name.file_types = nt,
-                    SettingsMessage::ContentLiteralMatch => ops.content.nonregex = !ops.content.nonregex,
                     SettingsMessage::ContentExtendedFiletypes => ops.content.extended = !ops.content.extended,
+                    SettingsMessage::ContentLiteralMatch => ops.content.nonregex = !ops.content.nonregex,
+                    SettingsMessage::NameCaseSensitive => ops.name.case_sensitive = !ops.name.case_sensitive,
+                    SettingsMessage::NameFollowSymlinks => ops.name.follow_links = !ops.name.follow_links,
+                    SettingsMessage::NameIgnoreHidden => ops.name.ignore_dot = !ops.name.ignore_dot,
+                    SettingsMessage::NameSameFilesystem => ops.name.same_filesystem = !ops.name.same_filesystem,
+                    SettingsMessage::NameType(nt) => ops.name.file_types = nt,
+                    SettingsMessage::NameUseGitignore => ops.name.use_gitignore = !ops.name.use_gitignore,
+                    SettingsMessage::SortType(sort) => ops.sort = sort,
                 }
                 self.manager.set_options(ops);
                 self.manager.save();
@@ -559,7 +586,7 @@ impl App {
             //keep looking for external messages.
             //this is a hack and polls receiver.
             //TODO: notify gui only if necessary (once results received) - dont know if possible with ICED
-            iced::time::every(Duration::from_millis(10)).map(|_| Message::CheckExternal),
+            iced::time::every(Duration::from_millis(100)).map(|_| Message::CheckExternal),
             //keyboard events
             event::listen().map(Message::Event),
         ])

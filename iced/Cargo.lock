@@ -2318,6 +2318,7 @@ dependencies = [
  "dirs",
  "grep",
  "ignore",
+ "indexmap",
  "markdownify",
  "num_cpus",
  "pdf-extract",

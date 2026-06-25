@@ -11,8 +11,9 @@ grep = "0"                                         #ripgrep
 ignore = "0.4"                                     #parallel walker from ripgrep
 walkdir = "2"                                      #walker from ripgrep
 dirs = "6"                                         #for getting config file
+indexmap = "2"                                     # preserves insertion order
 serde = { version = "1.0", features = ["derive"] } #save config
 toml = "1.1.2"                                     #config format
 termcolor = "1.4"                                  #unly used for grep to get nocolor
 pdf-extract = "0.10"                               # for pdf
-markdownify = "0.3.4"                              # for other docs
+markdownify = "0.3.6"                              # for other docs

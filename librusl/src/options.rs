@@ -72,7 +72,7 @@ pub struct ContentOptions {
     pub nonregex: bool, //--fixed-string
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Default)]
 pub enum Sort {
     #[default]
     None,

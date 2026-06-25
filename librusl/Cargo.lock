@@ -113,9 +113,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "calamine"
-version = "0.33.0"
+version = "0.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96ae094b353c7810cd5efd2e69413ebb9354816138a387c09f7b90d4e826a49f"
+checksum = "20ae05a4e39297eecf9a994210d27501318c37a9318201f8e11050add82bb6f0"
 dependencies = [
  "atoi_simd",
  "byteorder",
@@ -123,7 +123,7 @@ dependencies = [
  "encoding_rs",
  "fast-float2",
  "log",
- "quick-xml 0.38.4",
+ "quick-xml",
  "serde",
  "zip 7.2.0",
 ]
@@ -598,6 +598,7 @@ dependencies = [
  "dirs",
  "grep",
  "ignore",
+ "indexmap",
  "markdownify",
  "num_cpus",
  "pdf-extract",
@@ -659,9 +660,9 @@ dependencies = [
 
 [[package]]
 name = "markdownify"
-version = "0.3.4"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f9b5e9a0db7f9096ff28f7f0ffde45c9865e6e4c76d0fa6c729f22cc027de19"
+checksum = "d8d3345116fa0b7a1fd19fe89ebe74028ea3619697e7b41a08517e68731ae12d"
 dependencies = [
  "base64",
  "calamine",
@@ -670,7 +671,7 @@ dependencies = [
  "flate2",
  "infer",
  "lzma-rust2",
- "quick-xml 0.39.2",
+ "quick-xml",
  "tar",
  "thiserror",
  "zip 8.5.1",
@@ -811,20 +812,11 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.38.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b66c2058c55a409d601666cffe35f04333cf1013010882cec174a7467cd4e21c"
-dependencies = [
- "encoding_rs",
- "memchr",
-]
-
-[[package]]
-name = "quick-xml"
 version = "0.39.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "958f21e8e7ceb5a1aa7fa87fab28e7c75976e0bfe7e23ff069e0a260f894067d"
 dependencies = [
+ "encoding_rs",
  "memchr",
 ]
 
@@ -1054,9 +1046,9 @@ dependencies = [
 
 [[package]]
 name = "tar"
-version = "0.4.45"
+version = "0.4.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22692a6476a21fa75fdfc11d452fda482af402c008cdbaf3476414e122040973"
+checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
 dependencies = [
  "filetime",
  "libc",
