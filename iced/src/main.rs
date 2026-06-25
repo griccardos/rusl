@@ -7,7 +7,9 @@ use std::{
 
 use formato::Formato;
 use iced::{
-    alignment::Alignment, Color, Element, Font, Length, Subscription, Task, Theme, event,
+    Color, Element, Font, Length, Subscription, Task, Theme,
+    alignment::Alignment,
+    event,
     keyboard::{Event, Key, key::Named},
     widget::{
         Button, Column, Container, Row, Space, Text, TextInput, container, mouse_area,
@@ -232,39 +234,63 @@ impl App {
 
         let res = scrollable(res).width(Length::Fill);
 
-        let sets =
-            if self.show_settings {
-                let ops = self.manager.get_options();
-                Some(
-                    Column::new()
-                        .push(Text::new("Name settings").font(Font { weight: iced::font::Weight::Bold, ..Font::default() }))
-                        .push(checkbox("Case sensitive", ops.name.case_sensitive).on_toggle(|| Message::Settings(SettingsMessage::NameCaseSensitive)).into_widget())
-                        .push(checkbox("Same filesystem", ops.name.same_filesystem).on_toggle(|| Message::Settings(SettingsMessage::NameSameFilesystem)).into_widget())
-                        .push(checkbox("Ignore hidden", ops.name.ignore_dot).on_toggle(|| Message::Settings(SettingsMessage::NameIgnoreHidden)).into_widget())
-                        .push(checkbox("Use gitignore", ops.name.use_gitignore).on_toggle(|| Message::Settings(SettingsMessage::NameUseGitignore)).into_widget())
-                        .push(checkbox("Follow links", ops.name.follow_links).on_toggle(|| Message::Settings(SettingsMessage::NameFollowSymlinks)).into_widget())
-                        .push(
-                            Row::new()
-                                .push(radio("All", FTypes::All, Some(ops.name.file_types), |_| {
-                                    Message::Settings(SettingsMessage::NameType(FTypes::All))
-                                }))
-                                .push(radio("Files", FTypes::Files, Some(ops.name.file_types), |_| {
-                                    Message::Settings(SettingsMessage::NameType(FTypes::Files))
-                                }))
-                                .push(radio("Folders", FTypes::Directories, Some(ops.name.file_types), |_| {
-                                    Message::Settings(SettingsMessage::NameType(FTypes::Directories))
-                                }))
-                                .spacing(10),
-                        )
-                        .push(Space::new().height(Length::Fixed(10.)))
-                        .push(Text::new("Content settings").font(Font { weight: iced::font::Weight::Bold, ..Font::default() }))
-                        .push(checkbox("Case sensitive", ops.content.case_sensitive).on_toggle(|| Message::Settings(SettingsMessage::ContentCaseSensitive)).into_widget())
-                        .push(checkbox("Extended file types", ops.content.extended).on_toggle(|| Message::Settings(SettingsMessage::ContentExtendedFiletypes)).into_widget())
-                        .push(checkbox("Literal match (non regex)", ops.content.nonregex).on_toggle(|| Message::Settings(SettingsMessage::ContentLiteralMatch)).into_widget()),
-                )
-            } else {
-                None
-            };
+        let ops = self.manager.get_options();
+        let sets = if self.show_settings {
+            Some(
+                Column::new()
+                    .push(Text::new("Name settings").font(Font {
+                        weight: iced::font::Weight::Bold,
+                        ..Font::default()
+                    }))
+                    .push(
+                        checkbox("Case sensitive", ops.name.case_sensitive)
+                            .on_toggle(|| Message::Settings(SettingsMessage::NameCaseSensitive))
+                            .into_widget(),
+                    )
+                    .push(
+                        checkbox("Same filesystem", ops.name.same_filesystem)
+                            .on_toggle(|| Message::Settings(SettingsMessage::NameSameFilesystem))
+                            .into_widget(),
+                    )
+                    .push(
+                        checkbox("Ignore hidden", ops.name.ignore_dot)
+                            .on_toggle(|| Message::Settings(SettingsMessage::NameIgnoreHidden))
+                            .into_widget(),
+                    )
+                    .push(
+                        checkbox("Use gitignore", ops.name.use_gitignore)
+                            .on_toggle(|| Message::Settings(SettingsMessage::NameUseGitignore))
+                            .into_widget(),
+                    )
+                    .push(
+                        checkbox("Follow links", ops.name.follow_links)
+                            .on_toggle(|| Message::Settings(SettingsMessage::NameFollowSymlinks))
+                            .into_widget(),
+                    )
+                    .push(Space::new().height(Length::Fixed(10.)))
+                    .push(Text::new("Content settings").font(Font {
+                        weight: iced::font::Weight::Bold,
+                        ..Font::default()
+                    }))
+                    .push(
+                        checkbox("Case sensitive", ops.content.case_sensitive)
+                            .on_toggle(|| Message::Settings(SettingsMessage::ContentCaseSensitive))
+                            .into_widget(),
+                    )
+                    .push(
+                        checkbox("Extended file types", ops.content.extended)
+                            .on_toggle(|| Message::Settings(SettingsMessage::ContentExtendedFiletypes))
+                            .into_widget(),
+                    )
+                    .push(
+                        checkbox("Literal match (non regex)", ops.content.nonregex)
+                            .on_toggle(|| Message::Settings(SettingsMessage::ContentLiteralMatch))
+                            .into_widget(),
+                    ),
+            )
+        } else {
+            None
+        };
 
         Column::new()
             .padding(10)
@@ -284,16 +310,27 @@ impl App {
             .push(
                 Row::new()
                     .push(Text::new("Directory").width(Length::Fixed(100.)))
-                    .push(Button::new(Text::new("+")).on_press(Message::OpenDirectory))
+                    .push(Button::new(Text::new("📂")).on_press(Message::OpenDirectory))
                     .push(Space::new().width(Length::Fixed(10.)))
                     .push(dir),
             )
             .push(
-                Row::new()
-                    .spacing(15)
-                    .push(Button::new(Text::new("Settings")).on_press(Message::ToggleSettings))
-                    .push(sets),
+                Row::new().push(
+                    Row::new()
+                        .push(radio("All", FTypes::All, Some(ops.name.file_types), |_| {
+                            Message::Settings(SettingsMessage::NameType(FTypes::All))
+                        }))
+                        .push(radio("Files", FTypes::Files, Some(ops.name.file_types), |_| {
+                            Message::Settings(SettingsMessage::NameType(FTypes::Files))
+                        }))
+                        .push(radio("Folders", FTypes::Directories, Some(ops.name.file_types), |_| {
+                            Message::Settings(SettingsMessage::NameType(FTypes::Directories))
+                        }))
+                        .spacing(10),
+                ),
             )
+            .push(Row::new().push(Button::new(Text::new("Settings")).on_press(Message::ToggleSettings)))
+            .push(sets)
             .push(
                 Row::new()
                     .spacing(15)
@@ -383,8 +420,22 @@ impl App {
                     match res {
                         SearchResult::FinalResults(res) => {
                             self.searching = false;
-                            let filecount = res.data.iter().filter(|x| !x.is_folder).count();
-                            let foldercount = res.data.len() - filecount;
+                            let data_len = res.data.len();
+                            let display_count = data_len.min(1000);
+                            self.results = res.data.into_iter().take(display_count).collect();
+                            if data_len > 1000 {
+                                self.results.push(FileInfo {
+                                    path: format!("...and {} others", data_len - 1000),
+                                    matches: vec![],
+                                    ext: "".into(),
+                                    name: "".into(),
+                                    is_folder: false,
+                                    plugin: None,
+                                    ranges: vec![],
+                                });
+                            }
+                            let filecount = self.results.iter().filter(|x| !x.is_folder).count();
+                            let foldercount = self.results.len() - filecount;
                             let mut msg = String::new();
                             if filecount == 0 && foldercount == 0 {
                                 msg.push_str("Nothing found");
@@ -406,7 +457,7 @@ impl App {
                             if filecount > 0 && foldercount > 0 {
                                 msg += &format!(" {} total", (filecount + foldercount).formato("N0"));
                             }
-                            let line_count = res.data.iter().map(|x| x.matches.len()).sum::<usize>();
+                            let line_count = self.results.iter().map(|x| x.matches.len()).sum::<usize>();
                             if line_count > 0 {
                                 msg += &format!(" with {} lines", line_count.formato("N0"));
                             }
@@ -415,40 +466,34 @@ impl App {
                                 msg += " (stopped)";
                             }
                             self.message = msg;
-                            if res.data.len() > 1000 {
-                                self.results.push(FileInfo {
-                                    path: format!("...and {} others", res.data.len() - 1000),
-                                    matches: vec![],
-                                    ext: "".into(),
-                                    name: "".into(),
-                                    is_folder: false,
-                                    plugin: None,
-                                    ranges: vec![],
-                                });
-                            }
                         }
                         SearchResult::InterimResult(res) => {
-                            if self.results.len() < 1000 {
-                                self.results.push(res)
+                            //only pick up messages if searching (have not found final result) so we dont update ui unnecessarily
+                            if self.searching {
+                                if self.results.len() < 1000 {
+                                    self.results.push(res)
+                                }
+                                self.interim_count += 1;
+                                self.found += 1;
+                                self.message = format!(
+                                    "Found {} in {} files and folders. Searching...",
+                                    self.interim_count.formato("N0"),
+                                    self.searched_count.formato("N0")
+                                );
                             }
-                            self.interim_count += 1;
-                            self.found += 1;
-                            self.message = format!(
-                                "Found {} in {} files and folders. Searching...",
-                                self.interim_count.formato("N0"),
-                                self.searched_count.formato("N0")
-                            );
                         }
                         SearchResult::SearchErrors(errs) => {
                             self.errors.extend(errs);
                         }
                         SearchResult::SearchCount(count) => {
-                            self.searched_count = count;
-                            self.message = format!(
-                                "Found {} in {} files and folders. Searching...",
-                                self.interim_count.formato("N0"),
-                                self.searched_count.formato("N0")
-                            );
+                            if self.searching {
+                                self.searched_count = count;
+                                self.message = format!(
+                                    "Found {} in {} files and folders. Searching...",
+                                    self.interim_count.formato("N0"),
+                                    self.searched_count.formato("N0")
+                                );
+                            }
                         }
                     }
                 }
@@ -501,6 +546,7 @@ impl App {
                     SettingsMessage::ContentExtendedFiletypes => ops.content.extended = !ops.content.extended,
                 }
                 self.manager.set_options(ops);
+                self.manager.save();
             }
             Message::Event(_) => {}
         }
