@@ -11,6 +11,7 @@ use iced::{
     alignment::Alignment,
     event,
     keyboard::{Event, Key, key::Named},
+    theme::Base,
     widget::{
         Button, Column, Container, Row, Space, Text, TextInput, button, container, mouse_area,
         operation::{focus_next, focus_previous},
@@ -29,6 +30,52 @@ use librusl::{
     options::{FTypes, Sort},
     search::Search,
 };
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
+struct GuiOptions {
+    theme: String,
+}
+
+impl GuiOptions {
+    fn to_theme(&self) -> Theme {
+        Theme::ALL.iter().find(|t| t.name() == self.theme).cloned().unwrap_or(Theme::TokyoNight)
+    }
+
+    fn from_theme(theme: &Theme) -> Self {
+        Self {
+            theme: theme.name().to_string(),
+        }
+    }
+}
+
+fn get_gui_config_path() -> Option<String> {
+    if let Some(mut dir) = dirs::config_dir() {
+        dir.push("rusl");
+        if std::fs::create_dir_all(&dir).is_ok() {
+            dir.push("gui_config.toml");
+            return dir.to_str().map(|s| s.to_string());
+        }
+    }
+    None
+}
+
+fn load_gui_options() -> GuiOptions {
+    if let Some(file) = get_gui_config_path()
+        && let Ok(data) = std::fs::read_to_string(&file)
+            && let Ok(opts) = toml::from_str(&data) {
+                return opts;
+            }
+    GuiOptions {
+        theme: "TokyoNight".to_string(),
+    }
+}
+
+fn save_gui_options(opts: &GuiOptions) {
+    if let Some(file) = get_gui_config_path()
+        && let Ok(toml) = toml::to_string_pretty(opts) {
+            let _ = std::fs::write(&file, toml);
+        }
+}
 
 struct App {
     name: String,
@@ -101,6 +148,7 @@ impl App {
     fn new() -> (Self, Task<Message>) {
         let (s, r) = channel();
         let man = Manager::new(s);
+        let gui_opts = load_gui_options();
 
         let d = Self {
             name: "".to_string(),
@@ -117,7 +165,7 @@ impl App {
             showing_errors: false,
             searched_count: 0,
             interim_count: 0,
-            current_theme: Theme::TokyoNight,
+            current_theme: gui_opts.to_theme(),
         };
         (d, focus_next())
     }
@@ -594,9 +642,11 @@ impl App {
             Message::CycleTheme => {
                 let idx = Theme::ALL.iter().position(|t| *t == self.current_theme).unwrap_or(0);
                 self.current_theme = Theme::ALL[(idx + 1) % Theme::ALL.len()].clone();
+                save_gui_options(&GuiOptions::from_theme(&self.current_theme));
             }
             Message::ThemeSelected(theme) => {
                 self.current_theme = theme;
+                save_gui_options(&GuiOptions::from_theme(&self.current_theme));
             }
             Message::Event(_) => {}
         }
