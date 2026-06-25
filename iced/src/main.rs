@@ -14,7 +14,7 @@ use iced::{
     widget::{
         Button, Column, Container, Row, Space, Text, TextInput, button, container, mouse_area,
         operation::{focus_next, focus_previous},
-        radio, rich_text, scrollable, span, text,
+        pick_list, radio, rich_text, scrollable, span, text,
         text::Span,
         tooltip,
     },
@@ -45,6 +45,7 @@ struct App {
     showing_errors: bool,
     searched_count: usize,
     interim_count: usize,
+    current_theme: Theme,
 }
 
 #[derive(Debug, Clone)]
@@ -61,6 +62,8 @@ pub enum Message {
     ToggleErrors,
     ToggleSettings,
     Settings(SettingsMessage),
+    CycleTheme,
+    ThemeSelected(Theme),
 }
 #[derive(Debug, Clone)]
 pub enum SettingsMessage {
@@ -84,7 +87,7 @@ pub fn main() {
     let icon = image.into_raw();
 
     iced::application(App::new, App::update, App::view)
-        .theme(Theme::TokyoNight)
+        .theme(|app: &App| app.current_theme.clone())
         .subscription(App::subscription)
         .window(window::Settings {
             icon: Some(icon::from_rgba(icon, wid, hei).unwrap()),
@@ -114,6 +117,7 @@ impl App {
             showing_errors: false,
             searched_count: 0,
             interim_count: 0,
+            current_theme: Theme::TokyoNight,
         };
         (d, focus_next())
     }
@@ -287,7 +291,21 @@ impl App {
                         checkbox("Literal match (non regex)", ops.content.nonregex)
                             .on_toggle(|| Message::Settings(SettingsMessage::ContentLiteralMatch))
                             .into_widget(),
-                    ),
+                    )
+                    .push(Space::new().height(Length::Fixed(10.)))
+                    .push(Text::new("Appearance").font(Font {
+                        weight: iced::font::Weight::Bold,
+                        ..Font::default()
+                    }))
+                    .push({
+                        let selected = Some(self.current_theme.clone());
+                        Row::new()
+                            .align_y(Alignment::Center)
+                            .push(Text::new("Theme").width(Length::Fixed(100.)))
+                            .push(pick_list(Theme::ALL.to_vec(), selected, Message::ThemeSelected))
+                            .push(Space::new().width(Length::Fixed(10.)))
+                            .push(Button::new(Text::new("⟳")).on_press(Message::CycleTheme))
+                    }),
             )
         } else {
             None
@@ -572,6 +590,13 @@ impl App {
                 }
                 self.manager.set_options(ops);
                 self.manager.save();
+            }
+            Message::CycleTheme => {
+                let idx = Theme::ALL.iter().position(|t| *t == self.current_theme).unwrap_or(0);
+                self.current_theme = Theme::ALL[(idx + 1) % Theme::ALL.len()].clone();
+            }
+            Message::ThemeSelected(theme) => {
+                self.current_theme = theme;
             }
             Message::Event(_) => {}
         }
