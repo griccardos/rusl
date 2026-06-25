@@ -9,6 +9,7 @@ librusl = { path = "../librusl" }
 rfd = "0.17"                                                 #for selecting directory for gui
 iced = { version = "0.14.0", features = ["debug", "tokio"] } #gui
 image = "0.25"                                               #for icon
+formato = "0.3"
 
 [build-dependencies]
 embed-resource = "3.0" #for icon

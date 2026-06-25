@@ -5,6 +5,7 @@ use std::{
     time::Duration,
 };
 
+use formato::Formato;
 use iced::{
     Color, Element, Font, Length, Subscription, Task, Theme, event,
     keyboard::{Event, Key, key::Named},
@@ -169,9 +170,9 @@ impl App {
                     let icon = if x.path.starts_with("...") {
                         text!("")
                     } else if x.is_folder {
-                        text!("D")
+                        text!("📁")
                     } else {
-                        text!("F")
+                        text!("📝")
                     };
                     let icon = tooltip(
                         mouse_area(icon).on_press(Message::CopySingleToClipboard(x.path.clone())),
@@ -229,7 +230,7 @@ impl App {
                 .collect::<Vec<_>>(),
         );
 
-        let res = scrollable(res);
+        let res = scrollable(res).width(Length::Fill);
 
         let sets =
             if self.show_settings {
@@ -413,23 +414,23 @@ impl App {
                                 msg.push_str("Found");
                             }
                             if filecount > 0 {
-                                msg += &format!(" {filecount} file");
+                                msg += &format!(" {} file", filecount.formato("N0"));
                                 if filecount > 1 {
                                     msg.push('s');
                                 }
                             }
                             if foldercount > 0 {
-                                msg += &format!(" {foldercount} folder");
+                                msg += &format!(" {} folder", foldercount.formato("N0"));
                                 if foldercount > 1 {
                                     msg.push('s');
                                 }
                             }
                             if filecount > 0 && foldercount > 0 {
-                                msg += &format!(" {} total", filecount + foldercount);
+                                msg += &format!(" {} total", (filecount + foldercount).formato("N0"));
                             }
                             let line_count = res.data.iter().map(|x| x.matches.len()).sum::<usize>();
                             if line_count > 0 {
-                                msg += &format!(" with {} lines", line_count);
+                                msg += &format!(" with {} lines", line_count.formato("N0"));
                             }
                             msg += &format!(" in {:.3}s", res.duration.as_secs_f64());
                             if res.stopped {
@@ -454,14 +455,22 @@ impl App {
                             }
                             self.interim_count += 1;
                             self.found += 1;
-                            self.message = format!("Found {} in {} files and folders. Searching...", self.interim_count, self.searched_count);
+                            self.message = format!(
+                                "Found {} in {} files and folders. Searching...",
+                                self.interim_count.formato("N0"),
+                                self.searched_count.formato("N0")
+                            );
                         }
                         SearchResult::SearchErrors(errs) => {
                             self.errors.extend(errs);
                         }
                         SearchResult::SearchCount(count) => {
                             self.searched_count = count;
-                            self.message = format!("Found {} in {} files and folders. Searching...", self.interim_count, self.searched_count);
+                            self.message = format!(
+                                "Found {} in {} files and folders. Searching...",
+                                self.interim_count.formato("N0"),
+                                self.searched_count.formato("N0")
+                            );
                         }
                     }
                 }
