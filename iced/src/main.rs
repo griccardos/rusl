@@ -7,7 +7,7 @@ use std::{
 
 use formato::Formato;
 use iced::{
-    Color, Element, Font, Length, Subscription, Task, Theme, event,
+    alignment::Alignment, Color, Element, Font, Length, Subscription, Task, Theme, event,
     keyboard::{Event, Key, key::Named},
     widget::{
         Button, Column, Container, Row, Space, Text, TextInput, container, mouse_area,
@@ -237,26 +237,12 @@ impl App {
                 let ops = self.manager.get_options();
                 Some(
                     Column::new()
-                        .push(Text::new("Name settings"))
-                        .push(Row::new().push(Text::new("Case sensitive")).push(
-                            iced::widget::checkbox(ops.name.case_sensitive).on_toggle(|_| Message::Settings(SettingsMessage::NameCaseSensitive)),
-                        ))
-                        .push(Row::new().push(Text::new("Same filesystem")).push(
-                            iced::widget::checkbox(ops.name.same_filesystem).on_toggle(|_| Message::Settings(SettingsMessage::NameSameFilesystem)),
-                        ))
-                        .push(
-                            Row::new().push(Text::new("Ignore hidden")).push(
-                                iced::widget::checkbox(ops.name.ignore_dot).on_toggle(|_| Message::Settings(SettingsMessage::NameIgnoreHidden)),
-                            ),
-                        )
-                        .push(
-                            Row::new().push(Text::new("Use gitignore")).push(
-                                iced::widget::checkbox(ops.name.use_gitignore).on_toggle(|_| Message::Settings(SettingsMessage::NameUseGitignore)),
-                            ),
-                        )
-                        .push(Row::new().push(Text::new("Follow links")).push(
-                            iced::widget::checkbox(ops.name.follow_links).on_toggle(|_| Message::Settings(SettingsMessage::NameFollowSymlinks)),
-                        ))
+                        .push(Text::new("Name settings").font(Font { weight: iced::font::Weight::Bold, ..Font::default() }))
+                        .push(checkbox("Case sensitive", ops.name.case_sensitive).on_toggle(|| Message::Settings(SettingsMessage::NameCaseSensitive)).into_widget())
+                        .push(checkbox("Same filesystem", ops.name.same_filesystem).on_toggle(|| Message::Settings(SettingsMessage::NameSameFilesystem)).into_widget())
+                        .push(checkbox("Ignore hidden", ops.name.ignore_dot).on_toggle(|| Message::Settings(SettingsMessage::NameIgnoreHidden)).into_widget())
+                        .push(checkbox("Use gitignore", ops.name.use_gitignore).on_toggle(|| Message::Settings(SettingsMessage::NameUseGitignore)).into_widget())
+                        .push(checkbox("Follow links", ops.name.follow_links).on_toggle(|| Message::Settings(SettingsMessage::NameFollowSymlinks)).into_widget())
                         .push(
                             Row::new()
                                 .push(radio("All", FTypes::All, Some(ops.name.file_types), |_| {
@@ -270,19 +256,11 @@ impl App {
                                 }))
                                 .spacing(10),
                         )
-                        .push(Text::new("Content settings"))
-                        .push(
-                            Row::new().push(Text::new("Case sensitive")).push(
-                                iced::widget::checkbox(ops.content.case_sensitive)
-                                    .on_toggle(|_| Message::Settings(SettingsMessage::ContentCaseSensitive)),
-                            ),
-                        )
-                        .push(Row::new().push(Text::new("Extended file types")).push(
-                            iced::widget::checkbox(ops.content.extended).on_toggle(|_| Message::Settings(SettingsMessage::ContentExtendedFiletypes)),
-                        ))
-                        .push(Row::new().push(Text::new("Literal match (non regex)")).push(
-                            iced::widget::checkbox(ops.content.nonregex).on_toggle(|_| Message::Settings(SettingsMessage::ContentLiteralMatch)),
-                        )),
+                        .push(Space::new().height(Length::Fixed(10.)))
+                        .push(Text::new("Content settings").font(Font { weight: iced::font::Weight::Bold, ..Font::default() }))
+                        .push(checkbox("Case sensitive", ops.content.case_sensitive).on_toggle(|| Message::Settings(SettingsMessage::ContentCaseSensitive)).into_widget())
+                        .push(checkbox("Extended file types", ops.content.extended).on_toggle(|| Message::Settings(SettingsMessage::ContentExtendedFiletypes)).into_widget())
+                        .push(checkbox("Literal match (non regex)", ops.content.nonregex).on_toggle(|| Message::Settings(SettingsMessage::ContentLiteralMatch)).into_widget()),
                 )
             } else {
                 None
@@ -542,27 +520,31 @@ impl App {
     }
 }
 
-pub struct MyCheckbox {
-    label: &'static str,
+pub struct MyCheckbox<'a> {
+    label: &'a str,
     checked: bool,
-    callback: Option<fn() -> Message>,
+    callback: Option<Box<dyn Fn() -> Message>>,
 }
 
-impl MyCheckbox {
-    pub fn on_toggle(mut self, callback: fn() -> Message) -> Self {
-        self.callback = Some(callback);
+impl<'a> MyCheckbox<'a> {
+    pub fn on_toggle(mut self, callback: impl Fn() -> Message + 'static) -> Self {
+        self.callback = Some(Box::new(callback));
         self
     }
 
-    pub fn into_widget(self) -> iced::widget::Row<'static, Message> {
+    pub fn into_widget(self) -> iced::widget::Row<'a, Message> {
         let cb = self.callback.unwrap();
+        let checked = self.checked;
         iced::widget::Row::new()
+            .align_y(Alignment::Center)
+            .height(Length::Fixed(30.))
+            .push(iced::widget::checkbox(checked).on_toggle(move |_| cb()))
+            .push(Space::new().width(Length::Fixed(20.)))
             .push(iced::widget::text(self.label))
-            .push(iced::widget::checkbox(self.checked).on_toggle(move |_| cb()))
     }
 }
 
-pub fn checkbox(label: &'static str, checked: bool) -> MyCheckbox {
+pub fn checkbox<'a>(label: &'a str, checked: bool) -> MyCheckbox<'a> {
     MyCheckbox {
         label,
         checked,
