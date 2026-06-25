@@ -7,7 +7,7 @@ use std::{
 
 use formato::Formato;
 use iced::{
-    Color, Element, Font, Length, Padding, Subscription, Task, Theme,
+    Color, Element, Font, Length, Subscription, Task, Theme,
     alignment::Alignment,
     event,
     keyboard::{Event, Key, key::Named},
@@ -355,16 +355,14 @@ impl App {
                     .spacing(15)
                     .align_y(Alignment::Center)
                     .push(if self.searching {
-                        Button::new(Text::new("Stop"))
+                        Button::new(Container::new(Text::new("Stop")).align_x(Alignment::Center))
                             .width(80)
-                            .padding(Padding::default().horizontal(25).vertical(5))
                             .on_press(Message::FindPressed)
                     } else {
-                        Button::new(Text::new("Find"))
+                        Button::new(Container::new(Text::new("Find")).align_x(Alignment::Center))
                             .width(80)
-                            .padding(Padding::default().horizontal(25).vertical(5))
                             .on_press(Message::FindPressed)
-                            .style(|th, st| button::secondary(th, st))
+                            .style(button::secondary)
                     })
                     .push(Text::new(&self.message))
                     .push(clipboard),
