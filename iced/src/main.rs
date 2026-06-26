@@ -67,7 +67,8 @@ struct App {
     name: String,
     contents: String,
     directory: String,
-    results: Vec<FileInfo>,
+    display_results: Vec<FileInfo>,
+    full_results: Vec<FileInfo>,
     manager: Manager,
     receiver: Receiver<SearchResult>,
     message: String,
@@ -140,7 +141,8 @@ impl App {
             contents: "".to_string(),
             message: "".to_string(),
             directory: man.get_options().last_dir.clone(),
-            results: vec![],
+            display_results: vec![],
+            full_results: vec![],
             manager: man,
             receiver: r,
             found: 0,
@@ -167,7 +169,7 @@ impl App {
             .on_input(Message::ContentsChanged)
             .padding(4)
             .on_submit(Message::FindPressed);
-        let clipboard = if self.results.is_empty() {
+        let clipboard = if self.display_results.is_empty() {
             Container::new(Text::new(""))
         } else {
             Container::new(Button::new(Text::new("Clipboard")).on_press(Message::CopyAllToClipboard))
@@ -177,7 +179,7 @@ impl App {
             .padding(Padding::default().horizontal(8).vertical(4));
 
         let res = Column::with_children(
-            self.results
+            self.display_results
                 .iter()
                 .map(|x| -> Element<'_, Message> {
                     let max = 100;
@@ -449,7 +451,7 @@ impl App {
 
                     self.searching = false;
                 } else {
-                    self.results.clear();
+                    self.display_results.clear();
                     self.errors.clear();
                     self.showing_errors = false;
                     self.searching = true;
@@ -481,9 +483,10 @@ impl App {
                             self.searching = false;
                             let data_len = res.data.len();
                             let display_count = data_len.min(1000);
-                            self.results = res.data.into_iter().take(display_count).collect();
+                            self.display_results = res.data.iter().take(display_count).cloned().collect();
+                            self.full_results = res.data;
                             if data_len > 1000 {
-                                self.results.push(FileInfo {
+                                self.display_results.push(FileInfo {
                                     path: format!("...and {} others", data_len - 1000),
                                     matches: vec![],
                                     ext: "".into(),
@@ -493,8 +496,8 @@ impl App {
                                     ranges: vec![],
                                 });
                             }
-                            let filecount = self.results.iter().filter(|x| !x.is_folder).count();
-                            let foldercount = self.results.len() - filecount;
+                            let filecount = self.full_results.iter().filter(|x| !x.is_folder).count();
+                            let foldercount = self.full_results.len() - filecount;
                             let mut msg = String::new();
                             if filecount == 0 && foldercount == 0 {
                                 msg.push_str("Nothing found");
@@ -516,7 +519,7 @@ impl App {
                             if filecount > 0 && foldercount > 0 {
                                 msg += &format!(" {} total", (filecount + foldercount).formato("N0"));
                             }
-                            let line_count = self.results.iter().map(|x| x.matches.len()).sum::<usize>();
+                            let line_count = self.display_results.iter().map(|x| x.matches.len()).sum::<usize>();
                             if line_count > 0 {
                                 msg += &format!(" with {} lines", line_count.formato("N0"));
                             }
@@ -529,9 +532,10 @@ impl App {
                         SearchResult::InterimResult(res) => {
                             //only pick up messages if searching (have not found final result) so we dont update ui unnecessarily
                             if self.searching {
-                                if self.results.len() < 1000 {
-                                    self.results.push(res)
+                                if self.display_results.len() < 1000 {
+                                    self.display_results.push(res.clone())
                                 }
+                                self.full_results.push(res);
                                 self.interim_count += 1;
                                 self.found += 1;
                                 self.message = format!(
@@ -577,7 +581,7 @@ impl App {
             }
 
             Message::CopyAllToClipboard => {
-                let text = self.results.iter().map(|x| x.path.clone()).collect::<Vec<_>>().join("\n");
+                let text = self.full_results.iter().map(|x| x.path.clone()).collect::<Vec<_>>().join("\n");
                 self.message = "Copied to clipboard".to_string();
                 return iced::clipboard::write(text);
             }
