@@ -1,34 +1,19 @@
 //hide windows console
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use std::{
-    sync::mpsc::{Receiver, channel},
-    time::Duration,
-};
 
-use formato::Formato;
-use iced::{
-    Color, Element, Font, Length, Subscription, Task, Theme,
-    alignment::Alignment,
-    event,
-    keyboard::{Event, Key, key::Named},
-    theme::Base,
-    widget::{
-        Button, Column, Container, Row, Space, Text, TextInput, button, container, mouse_area,
-        operation::{focus_next, focus_previous},
-        pick_list, radio, rich_text, scrollable, span, text,
-        text::Span,
-        tooltip,
-    },
-    window::{self, icon},
-};
-
-//use iced_core::{text::Span, window};
 use librusl::{
     extended::ExtendedTrait,
     fileinfo::FileInfo,
     manager::{Manager, SearchResult},
     options::{FTypes, Sort},
     search::Search,
+};
+
+const BOLD: Font = Font {
+    family: Family::SansSerif,
+    weight: Bold,
+    stretch: Stretch::Normal,
+    style: Style::Normal,
 };
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
@@ -174,11 +159,11 @@ impl App {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let name = TextInput::new("Find file name", &self.name)
+        let name = TextInput::new("Regex file name search e.g. ^mai\\.*rs$ or b.st or ^best", &self.name)
             .padding(4)
             .on_input(Message::NameChanged)
             .on_submit(Message::FindPressed);
-        let contents = TextInput::new("Find contents", &self.contents)
+        let contents = TextInput::new("Regex content search e.g. str.{2}g", &self.contents)
             .on_input(Message::ContentsChanged)
             .padding(4)
             .on_submit(Message::FindPressed);
@@ -187,7 +172,9 @@ impl App {
         } else {
             Container::new(Button::new(Text::new("Clipboard")).on_press(Message::CopyAllToClipboard))
         };
-        let dir = TextInput::new("", &self.directory).on_input(Message::DirectoryChanged).padding(4);
+        let dir = TextInput::new("", &self.directory)
+            .on_input(Message::DirectoryChanged)
+            .padding(Padding::default().horizontal(8).vertical(4));
 
         let res = Column::with_children(
             self.results
@@ -202,22 +189,13 @@ impl App {
                     rts.push(span(&x.path[0..x.path.len() - x.name.len()]));
                     for r in &x.ranges {
                         if start < r.start {
-                            rts.push(span(&x.name[start..r.start]).font(Font {
-                                weight: iced::font::Weight::Bold,
-                                ..Font::default()
-                            }));
+                            rts.push(span(&x.name[start..r.start]).font(BOLD));
                         }
-                        rts.push(span(&x.name[r.start..r.end]).color(Color::from_rgb8(200, 100, 100)).font(Font {
-                            weight: iced::font::Weight::Bold,
-                            ..Font::default()
-                        }));
+                        rts.push(span(&x.name[r.start..r.end]).color(Color::from_rgb8(200, 100, 100)).font(BOLD));
                         start = r.end;
                     }
                     if start < x.name.len() {
-                        rts.push(span(&x.name[start..]).font(Font {
-                            weight: iced::font::Weight::Bold,
-                            ..Font::default()
-                        }));
+                        rts.push(span(&x.name[start..]).font(BOLD));
                     }
                     // add plugin label span if present
                     if let Some(plug) = &x.plugin {
@@ -243,10 +221,7 @@ impl App {
 
                     //content matches
                     for cline in x.matches.iter().take(max) {
-                        let line_font = Font {
-                            weight: iced::font::Weight::Bold,
-                            ..Font::default()
-                        };
+                        let line_font = BOLD;
                         let mut cspans: Vec<Span> = vec![span(format!("{}: ", cline.line)).color(Color::from_rgb8(17, 122, 13)).font(line_font)];
                         let mut last = 0;
                         //careful of char boudaries
@@ -261,10 +236,7 @@ impl App {
                                 break;
                             }
                             cspans.push(span(text[last..range.start].to_owned()).color(Color::from_rgb8(200, 200, 200)));
-                            let match_font = Font {
-                                weight: iced::font::Weight::Bold,
-                                ..Font::default()
-                            };
+                            let match_font = BOLD;
                             cspans.push(
                                 span(text[range.start..range.end].to_owned())
                                     .color(Color::from_rgb8(255, 0, 0))
@@ -294,10 +266,7 @@ impl App {
         let sets = if self.gui_options.show_settings {
             Some(
                 Column::new()
-                    .push(Text::new("Name settings").font(Font {
-                        weight: iced::font::Weight::Bold,
-                        ..Font::default()
-                    }))
+                    .push(Text::new("Name settings").font(BOLD))
                     .push(
                         checkbox("Case sensitive", ops.name.case_sensitive)
                             .on_toggle(|| Message::Settings(SettingsMessage::NameCaseSensitive))
@@ -324,10 +293,7 @@ impl App {
                             .into_widget(),
                     )
                     .push(Space::new().height(Length::Fixed(10.)))
-                    .push(Text::new("Content settings").font(Font {
-                        weight: iced::font::Weight::Bold,
-                        ..Font::default()
-                    }))
+                    .push(Text::new("Content settings").font(BOLD))
                     .push(
                         checkbox("Case sensitive", ops.content.case_sensitive)
                             .on_toggle(|| Message::Settings(SettingsMessage::ContentCaseSensitive))
@@ -344,10 +310,7 @@ impl App {
                             .into_widget(),
                     )
                     .push(Space::new().height(Length::Fixed(10.)))
-                    .push(Text::new("Appearance").font(Font {
-                        weight: iced::font::Weight::Bold,
-                        ..Font::default()
-                    }))
+                    .push(Text::new("Appearance").font(BOLD))
                     .push({
                         let selected = self.gui_options.theme();
                         Row::new()
@@ -380,44 +343,48 @@ impl App {
             .push(
                 Row::new()
                     .push(Text::new("Directory").width(Length::Fixed(100.)))
-                    .push(Button::new(Text::new("📂")).on_press(Message::OpenDirectory))
                     .push(Space::new().width(Length::Fixed(10.)))
+                    .push(Button::new(Text::new("📂")).height(28).on_press(Message::OpenDirectory))
                     .push(dir),
             )
             .push(
-                Row::new().push(
-                    Row::new()
-                        .push(radio("All", FTypes::All, Some(ops.name.file_types), |_| {
-                            Message::Settings(SettingsMessage::NameType(FTypes::All))
-                        }))
-                        .push(radio("Files", FTypes::Files, Some(ops.name.file_types), |_| {
-                            Message::Settings(SettingsMessage::NameType(FTypes::Files))
-                        }))
-                        .push(radio("Folders", FTypes::Directories, Some(ops.name.file_types), |_| {
-                            Message::Settings(SettingsMessage::NameType(FTypes::Directories))
-                        }))
-                        .spacing(10),
-                ),
-            )
-            .push({
-                let sort = ops.sort;
                 Row::new()
-                    .push(text("Sort Results"))
-                    .push(radio("None", Sort::None, Some(sort), |_| {
-                        Message::Settings(SettingsMessage::SortType(Sort::None))
-                    }))
-                    .push(radio("Path", Sort::Path, Some(sort), |_| {
-                        Message::Settings(SettingsMessage::SortType(Sort::Path))
-                    }))
-                    .push(radio("Name", Sort::Name, Some(sort), |_| {
-                        Message::Settings(SettingsMessage::SortType(Sort::Name))
-                    }))
-                    .push(radio("Ext", Sort::Extension, Some(sort), |_| {
-                        Message::Settings(SettingsMessage::SortType(Sort::Extension))
-                    }))
-                    .spacing(10)
-            })
-            .push(Row::new().push(Button::new(Text::new("Settings")).on_press(Message::ToggleSettings)))
+                    .spacing(20)
+                    .align_y(Alignment::Center)
+                    .push(Row::new().push(Button::new(Text::new("Settings")).on_press(Message::ToggleSettings)))
+                    .push(text("File Types:").font(BOLD))
+                    .push(
+                        Row::new()
+                            .push(radio("All", FTypes::All, Some(ops.name.file_types), |_| {
+                                Message::Settings(SettingsMessage::NameType(FTypes::All))
+                            }))
+                            .push(radio("Files", FTypes::Files, Some(ops.name.file_types), |_| {
+                                Message::Settings(SettingsMessage::NameType(FTypes::Files))
+                            }))
+                            .push(radio("Folders", FTypes::Directories, Some(ops.name.file_types), |_| {
+                                Message::Settings(SettingsMessage::NameType(FTypes::Directories))
+                            }))
+                            .spacing(10),
+                    )
+                    .push({
+                        let sort = ops.sort;
+                        Row::new()
+                            .push(text("Sort Results:").font(BOLD))
+                            .push(radio("None", Sort::None, Some(sort), |_| {
+                                Message::Settings(SettingsMessage::SortType(Sort::None))
+                            }))
+                            .push(radio("Path", Sort::Path, Some(sort), |_| {
+                                Message::Settings(SettingsMessage::SortType(Sort::Path))
+                            }))
+                            .push(radio("Name", Sort::Name, Some(sort), |_| {
+                                Message::Settings(SettingsMessage::SortType(Sort::Name))
+                            }))
+                            .push(radio("Ext", Sort::Extension, Some(sort), |_| {
+                                Message::Settings(SettingsMessage::SortType(Sort::Extension))
+                            }))
+                            .spacing(10)
+                    }),
+            )
             .push(sets)
             .push(
                 Row::new()
@@ -431,7 +398,6 @@ impl App {
                         Button::new(Container::new(Text::new("Find")).align_x(Alignment::Center))
                             .width(80)
                             .on_press(Message::FindPressed)
-                            .style(button::secondary)
                     })
                     .push(Text::new(&self.message))
                     .push(clipboard),
@@ -701,3 +667,26 @@ pub fn checkbox<'a>(label: &'a str, checked: bool) -> MyCheckbox<'a> {
         callback: None,
     }
 }
+
+use std::{
+    sync::mpsc::{Receiver, channel},
+    time::Duration,
+};
+
+use formato::Formato;
+use iced::{
+    Color, Element, Font, Length, Padding, Subscription, Task, Theme,
+    alignment::Alignment,
+    event,
+    font::{Family, Stretch, Style, Weight::Bold},
+    keyboard::{Event, Key, key::Named},
+    theme::Base,
+    widget::{
+        Button, Column, Container, Row, Space, Text, TextInput, container, mouse_area,
+        operation::{focus_next, focus_previous},
+        pick_list, radio, rich_text, scrollable, span, text,
+        text::Span,
+        tooltip,
+    },
+    window::{self, icon},
+};
