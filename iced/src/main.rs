@@ -34,47 +34,48 @@ use librusl::{
 #[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
 struct GuiOptions {
     theme: String,
+    show_settings: bool,
 }
 
 impl GuiOptions {
-    fn to_theme(&self) -> Theme {
+    fn get_gui_config_path() -> Option<String> {
+        if let Some(mut dir) = dirs::config_dir() {
+            dir.push("rusl");
+            if std::fs::create_dir_all(&dir).is_ok() {
+                dir.push("gui_config.toml");
+                return dir.to_str().map(|s| s.to_string());
+            }
+        }
+        None
+    }
+    fn load() -> GuiOptions {
+        if let Some(file) = GuiOptions::get_gui_config_path()
+            && let Ok(data) = std::fs::read_to_string(&file)
+            && let Ok(opts) = toml::from_str(&data)
+        {
+            return opts;
+        }
+        GuiOptions {
+            theme: Theme::TokyoNight.name().to_string(),
+            show_settings: false,
+        }
+    }
+
+    fn save(&self) {
+        if let Some(file) = GuiOptions::get_gui_config_path()
+            && let Ok(toml) = toml::to_string_pretty(self)
+        {
+            let _ = std::fs::write(&file, toml);
+        }
+    }
+
+    fn theme(&self) -> Theme {
         Theme::ALL.iter().find(|t| t.name() == self.theme).cloned().unwrap_or(Theme::TokyoNight)
     }
 
-    fn from_theme(theme: &Theme) -> Self {
-        Self {
-            theme: theme.name().to_string(),
-        }
+    fn set_theme(&mut self, theme: &Theme) {
+        self.theme = theme.to_string();
     }
-}
-
-fn get_gui_config_path() -> Option<String> {
-    if let Some(mut dir) = dirs::config_dir() {
-        dir.push("rusl");
-        if std::fs::create_dir_all(&dir).is_ok() {
-            dir.push("gui_config.toml");
-            return dir.to_str().map(|s| s.to_string());
-        }
-    }
-    None
-}
-
-fn load_gui_options() -> GuiOptions {
-    if let Some(file) = get_gui_config_path()
-        && let Ok(data) = std::fs::read_to_string(&file)
-            && let Ok(opts) = toml::from_str(&data) {
-                return opts;
-            }
-    GuiOptions {
-        theme: "TokyoNight".to_string(),
-    }
-}
-
-fn save_gui_options(opts: &GuiOptions) {
-    if let Some(file) = get_gui_config_path()
-        && let Ok(toml) = toml::to_string_pretty(opts) {
-            let _ = std::fs::write(&file, toml);
-        }
 }
 
 struct App {
@@ -87,12 +88,11 @@ struct App {
     message: String,
     found: usize,
     searching: bool,
-    show_settings: bool,
     errors: Vec<String>,
     showing_errors: bool,
     searched_count: usize,
     interim_count: usize,
-    current_theme: Theme,
+    gui_options: GuiOptions,
 }
 
 #[derive(Debug, Clone)]
@@ -134,7 +134,7 @@ pub fn main() {
     let icon = image.into_raw();
 
     iced::application(App::new, App::update, App::view)
-        .theme(|app: &App| app.current_theme.clone())
+        .theme(|app: &App| app.gui_options.theme())
         .subscription(App::subscription)
         .window(window::Settings {
             icon: Some(icon::from_rgba(icon, wid, hei).unwrap()),
@@ -148,7 +148,7 @@ impl App {
     fn new() -> (Self, Task<Message>) {
         let (s, r) = channel();
         let man = Manager::new(s);
-        let gui_opts = load_gui_options();
+        let gui_options = GuiOptions::load();
 
         let d = Self {
             name: "".to_string(),
@@ -160,14 +160,17 @@ impl App {
             receiver: r,
             found: 0,
             searching: false,
-            show_settings: false,
             errors: vec![],
             showing_errors: false,
             searched_count: 0,
             interim_count: 0,
-            current_theme: gui_opts.to_theme(),
+            gui_options,
         };
         (d, focus_next())
+    }
+
+    fn save_gui_options(&self) {
+        self.gui_options.save();
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -288,7 +291,7 @@ impl App {
         let res = scrollable(res).width(Length::Fill);
 
         let ops = self.manager.get_options();
-        let sets = if self.show_settings {
+        let sets = if self.gui_options.show_settings {
             Some(
                 Column::new()
                     .push(Text::new("Name settings").font(Font {
@@ -346,11 +349,11 @@ impl App {
                         ..Font::default()
                     }))
                     .push({
-                        let selected = Some(self.current_theme.clone());
+                        let selected = self.gui_options.theme();
                         Row::new()
                             .align_y(Alignment::Center)
                             .push(Text::new("Theme").width(Length::Fixed(100.)))
-                            .push(pick_list(Theme::ALL.to_vec(), selected, Message::ThemeSelected))
+                            .push(pick_list(Theme::ALL.to_vec(), Some(selected), Message::ThemeSelected))
                             .push(Space::new().width(Length::Fixed(10.)))
                             .push(Button::new(Text::new("⟳")).on_press(Message::CycleTheme))
                     }),
@@ -620,7 +623,8 @@ impl App {
                 self.showing_errors = !self.showing_errors;
             }
             Message::ToggleSettings => {
-                self.show_settings = !self.show_settings;
+                self.gui_options.show_settings = !self.gui_options.show_settings;
+                self.save_gui_options();
             }
             Message::Settings(ms) => {
                 let mut ops = self.manager.get_options().clone();
@@ -640,13 +644,13 @@ impl App {
                 self.manager.save();
             }
             Message::CycleTheme => {
-                let idx = Theme::ALL.iter().position(|t| *t == self.current_theme).unwrap_or(0);
-                self.current_theme = Theme::ALL[(idx + 1) % Theme::ALL.len()].clone();
-                save_gui_options(&GuiOptions::from_theme(&self.current_theme));
+                let idx = Theme::ALL.iter().position(|t| *t == self.gui_options.theme()).unwrap_or(0);
+                self.gui_options.set_theme(&Theme::ALL[(idx + 1) % Theme::ALL.len()]);
+                self.save_gui_options();
             }
             Message::ThemeSelected(theme) => {
-                self.current_theme = theme;
-                save_gui_options(&GuiOptions::from_theme(&self.current_theme));
+                self.gui_options.set_theme(&theme);
+                self.save_gui_options();
             }
             Message::Event(_) => {}
         }
