@@ -20,6 +20,7 @@ const BOLD: Font = Font {
 struct GuiOptions {
     theme: String,
     show_settings: bool,
+    display_limit: usize,
 }
 
 impl GuiOptions {
@@ -43,6 +44,7 @@ impl GuiOptions {
         GuiOptions {
             theme: Theme::TokyoNight.name().to_string(),
             show_settings: false,
+            display_limit: 1000,
         }
     }
 
@@ -110,6 +112,7 @@ pub enum SettingsMessage {
     ContentLiteralMatch,
     NameType(FTypes),
     SortType(Sort),
+    DisplayLimit(String),
 }
 
 pub fn main() {
@@ -321,7 +324,20 @@ impl App {
                             .push(pick_list(Theme::ALL.to_vec(), Some(selected), Message::ThemeSelected))
                             .push(Space::new().width(Length::Fixed(10.)))
                             .push(Button::new(Text::new("⟳")).on_press(Message::CycleTheme))
-                    }),
+                    })
+                    .push(Space::new().height(Length::Fixed(10.)))
+                    .push(Text::new("Results").font(BOLD))
+                    .push(
+                        Row::new()
+                            .align_y(Alignment::Center)
+                            .push(Text::new("Display limit").width(Length::Fixed(100.)))
+                            .push(
+                                TextInput::new("", &self.gui_options.display_limit.to_string())
+                                    .on_input(|s| Message::Settings(SettingsMessage::DisplayLimit(s)))
+                                    .padding(4)
+                                    .width(Length::Fixed(80.)),
+                            ),
+                    ),
             )
         } else {
             None
@@ -482,12 +498,12 @@ impl App {
                         SearchResult::FinalResults(res) => {
                             self.searching = false;
                             let data_len = res.data.len();
-                            let display_count = data_len.min(1000);
+                            let display_count = data_len.min(self.gui_options.display_limit);
                             self.display_results = res.data.iter().take(display_count).cloned().collect();
                             self.full_results = res.data;
-                            if data_len > 1000 {
+                            if data_len > self.gui_options.display_limit {
                                 self.display_results.push(FileInfo {
-                                    path: format!("...and {} others", data_len - 1000),
+                                    path: format!("...and {} others", data_len - self.gui_options.display_limit),
                                     matches: vec![],
                                     ext: "".into(),
                                     name: "".into(),
@@ -532,7 +548,7 @@ impl App {
                         SearchResult::InterimResult(res) => {
                             //only pick up messages if searching (have not found final result) so we dont update ui unnecessarily
                             if self.searching {
-                                if self.display_results.len() < 1000 {
+                                if self.display_results.len() < self.gui_options.display_limit {
                                     self.display_results.push(res.clone())
                                 }
                                 self.full_results.push(res);
@@ -609,6 +625,14 @@ impl App {
                     SettingsMessage::NameType(nt) => ops.name.file_types = nt,
                     SettingsMessage::NameUseGitignore => ops.name.use_gitignore = !ops.name.use_gitignore,
                     SettingsMessage::SortType(sort) => ops.sort = sort,
+                    SettingsMessage::DisplayLimit(val) => {
+                        if let Ok(limit) = val.parse::<usize>()
+                            && limit > 0
+                        {
+                            self.gui_options.display_limit = limit;
+                            self.save_gui_options();
+                        }
+                    }
                 }
                 self.manager.set_options(ops);
                 self.manager.save();
