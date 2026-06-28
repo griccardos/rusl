@@ -81,6 +81,8 @@ struct App {
     searched_count: usize,
     interim_count: usize,
     gui_options: GuiOptions,
+    size_compare: String,
+    size_value: String,
 }
 
 #[derive(Debug, Clone)]
@@ -113,6 +115,8 @@ pub enum SettingsMessage {
     NameType(FTypes),
     SortType(Sort),
     DisplayLimit(String),
+    SizeOperator(String),
+    SizeValue(String),
 }
 
 pub fn main() {
@@ -138,6 +142,7 @@ impl App {
         let (s, r) = channel();
         let man = Manager::new(s);
         let gui_options = GuiOptions::load();
+        let ops = man.get_options();
 
         let d = Self {
             name: "".to_string(),
@@ -155,6 +160,8 @@ impl App {
             searched_count: 0,
             interim_count: 0,
             gui_options,
+            size_compare: ops.size.operator.as_str().to_string(),
+            size_value: "".to_string(),
         };
         (d, focus_next())
     }
@@ -220,7 +227,17 @@ impl App {
                         container("Click to copy path to clipboard").padding(10).style(container::rounded_box),
                         tooltip::Position::Right,
                     );
-                    let row = Row::new().spacing(10).push(icon).push(rt);
+                    let show_size = self.size_compare != "None" && !self.size_value.is_empty();
+                    let size_label = if x.path.starts_with("...") {
+                        Container::new(text!(""))
+                    } else if show_size {
+                        Container::new(text!("{}", format_size(x.file_size)).color(Color::from_rgb8(150, 150, 150)))
+                            .width(Length::Fixed(60.))
+                            .align_x(Alignment::End)
+                    } else {
+                        Container::new(text!(""))
+                    };
+                    let row = Row::new().spacing(10).push(icon).push(size_label).push(rt);
 
                     let mut col = Column::new().push(row);
 
@@ -315,6 +332,33 @@ impl App {
                             .into_widget(),
                     )
                     .push(Space::new().height(Length::Fixed(10.)))
+                    .push(Text::new("Size").font(BOLD))
+                    .push({
+                        let operators = vec!["None".to_string(), ">=".to_string(), "<".to_string(), "=".to_string()];
+                        Row::new()
+                            .align_y(Alignment::Center)
+                            .push(Text::new("Operator").width(Length::Fixed(100.)))
+                            .push(pick_list(operators, Some(self.size_compare.clone()), |s| {
+                                Message::Settings(SettingsMessage::SizeOperator(s))
+                            }))
+                    })
+                    .push(Space::new().height(Length::Fixed(2.)))
+                    .push({
+                        let is_active = self.size_compare != "None";
+                        let input = TextInput::new(if is_active { "e.g. 500M, 20k, 5G, 1234" } else { "" }, &self.size_value)
+                            .padding(4)
+                            .width(Length::Fixed(150.));
+                        let input = if is_active {
+                            input.on_input(|s| Message::Settings(SettingsMessage::SizeValue(s)))
+                        } else {
+                            input
+                        };
+                        Row::new()
+                            .align_y(Alignment::Center)
+                            .push(Text::new("Value").width(Length::Fixed(100.)))
+                            .push(input)
+                    })
+                    .push(Space::new().height(Length::Fixed(10.)))
                     .push(Text::new("Appearance").font(BOLD))
                     .push({
                         let selected = self.gui_options.theme();
@@ -337,6 +381,29 @@ impl App {
                                     .padding(4)
                                     .width(Length::Fixed(80.)),
                             ),
+                    )
+                    .push(Space::new().height(Length::Fixed(4.)))
+                    .push(
+                        Row::new()
+                            .align_y(Alignment::Center)
+                            .push(Text::new("Sort").width(Length::Fixed(100.)))
+                            .push({
+                                let sort = ops.sort;
+                                Row::new()
+                                    .push(radio("None", Sort::None, Some(sort), |_| {
+                                        Message::Settings(SettingsMessage::SortType(Sort::None))
+                                    }))
+                                    .push(radio("Path", Sort::Path, Some(sort), |_| {
+                                        Message::Settings(SettingsMessage::SortType(Sort::Path))
+                                    }))
+                                    .push(radio("Name", Sort::Name, Some(sort), |_| {
+                                        Message::Settings(SettingsMessage::SortType(Sort::Name))
+                                    }))
+                                    .push(radio("Ext", Sort::Extension, Some(sort), |_| {
+                                        Message::Settings(SettingsMessage::SortType(Sort::Extension))
+                                    }))
+                                    .spacing(10)
+                            }),
                     ),
             )
         } else {
@@ -383,25 +450,7 @@ impl App {
                                 Message::Settings(SettingsMessage::NameType(FTypes::Directories))
                             }))
                             .spacing(10),
-                    )
-                    .push({
-                        let sort = ops.sort;
-                        Row::new()
-                            .push(text("Sort Results:").font(BOLD))
-                            .push(radio("None", Sort::None, Some(sort), |_| {
-                                Message::Settings(SettingsMessage::SortType(Sort::None))
-                            }))
-                            .push(radio("Path", Sort::Path, Some(sort), |_| {
-                                Message::Settings(SettingsMessage::SortType(Sort::Path))
-                            }))
-                            .push(radio("Name", Sort::Name, Some(sort), |_| {
-                                Message::Settings(SettingsMessage::SortType(Sort::Name))
-                            }))
-                            .push(radio("Ext", Sort::Extension, Some(sort), |_| {
-                                Message::Settings(SettingsMessage::SortType(Sort::Extension))
-                            }))
-                            .spacing(10)
-                    }),
+                    ),
             )
             .push(sets)
             .push(
@@ -508,6 +557,7 @@ impl App {
                                     ext: "".into(),
                                     name: "".into(),
                                     is_folder: false,
+                                    file_size: 0,
                                     plugin: None,
                                     ranges: vec![],
                                 });
@@ -633,6 +683,20 @@ impl App {
                             self.save_gui_options();
                         }
                     }
+                    SettingsMessage::SizeOperator(val) => {
+                        self.size_compare = val.clone();
+                        ops.size.operator = val.into();
+                        if ops.size.operator == librusl::options::SizeCompare::None {
+                            self.size_value = String::new();
+                            ops.size.bytes = 0;
+                        }
+                    }
+                    SettingsMessage::SizeValue(val) => {
+                        self.size_value = val.clone();
+                        if let Ok(bytes) = parse_size(&val) {
+                            ops.size.bytes = bytes;
+                        }
+                    }
                 }
                 self.manager.set_options(ops);
                 self.manager.save();
@@ -661,6 +725,47 @@ impl App {
             //keyboard events
             event::listen().map(Message::Event),
         ])
+    }
+}
+
+fn parse_size(input: &str) -> Result<u64, ()> {
+    let input = input.trim();
+    if input.is_empty() {
+        return Ok(0);
+    }
+    let (num_str, suffix) = if let Some(pos) = input.find(|c: char| c.is_alphabetic()) {
+        (&input[..pos], &input[pos..])
+    } else {
+        (input, "")
+    };
+    let num: f64 = num_str.parse().map_err(|_| ())?;
+    let multiplier: u64 = match suffix.to_lowercase().as_str() {
+        "k" => 1_024,
+        "m" => 1_024 * 1_024,
+        "g" => 1_024 * 1_024 * 1_024,
+        "" => 1,
+        _ => return Err(()),
+    };
+    Ok((num * multiplier as f64) as u64)
+}
+
+fn format_size(bytes: u64) -> String {
+    if bytes == 0 {
+        return String::new();
+    }
+    const KB: f64 = 1_024.0;
+    const MB: f64 = KB * 1_024.0;
+    const GB: f64 = MB * 1_024.0;
+    let b = bytes as f64;
+
+    if b >= GB {
+        format!("{:.1}G", b / GB)
+    } else if b >= MB {
+        format!("{:.1}M", b / MB)
+    } else if b >= KB {
+        format!("{:.1}K", b / KB)
+    } else {
+        format!("{}", bytes)
     }
 }
 

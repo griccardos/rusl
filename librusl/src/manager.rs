@@ -13,7 +13,7 @@ use indexmap::IndexMap;
 
 use crate::extended::ExtendedType;
 use crate::fileinfo::{FileInfo, Match};
-use crate::options::{FTypes, Options, Sort};
+use crate::options::{FTypes, Options, SizeCompare, Sort};
 use crate::rgtools::{self, EXTENSION_SEPARATOR, SEPARATOR};
 use crate::search::Search;
 
@@ -279,7 +279,7 @@ impl Manager {
                 }
                 let is_match = re.clone().is_match(dent.file_name().to_str().unwrap_or_default());
 
-                if is_match {
+                if is_match && Manager::check_size(&dent, &options.size) {
                     let mut must_add = true;
                     let mut matches = vec![];
                     if !search.contents_text.is_empty() {
@@ -317,6 +317,7 @@ impl Manager {
                             .find_iter(dent.file_name().to_str().unwrap_or_default())
                             .map(|a| a.range())
                             .collect::<Vec<_>>();
+                        let file_size = dent.path().metadata().map(|m| m.len()).unwrap_or(0);
 
                         let res = file_sender.send(Message::File(
                             FileInfo {
@@ -330,6 +331,7 @@ impl Manager {
                                     .into(),
                                 matches,
                                 is_folder: dent.file_type().unwrap().is_dir(),
+                                file_size,
                                 plugin: None,
                                 ranges: regex_matches,
                             },
@@ -390,6 +392,7 @@ impl Manager {
                 ext: pb.extension().unwrap_or(&OsString::from("")).to_str().unwrap_or_default().into(),
                 name: PathBuf::from(f[0]).file_name().unwrap_or_default().to_str().unwrap_or_default().into(),
                 is_folder: pb.is_dir(),
+                file_size: pb.metadata().map(|m| m.len()).unwrap_or(0),
                 plugin: extended,
                 ranges: vec![],
             });
@@ -403,6 +406,19 @@ impl Manager {
         ContentFileInfoResults {
             results: hm.into_values().collect(),
             errors,
+        }
+    }
+
+    fn check_size(dent: &ignore::DirEntry, ops: &crate::options::SizeOptions) -> bool {
+        let Ok(meta) = dent.path().metadata() else {
+            return false;
+        };
+        let size = meta.len();
+        match ops.operator {
+            SizeCompare::GreaterThanOrEqualTo => size >= ops.bytes,
+            SizeCompare::LessThan => size < ops.bytes,
+            SizeCompare::EqualTo => size == ops.bytes,
+            SizeCompare::None => true,
         }
     }
 

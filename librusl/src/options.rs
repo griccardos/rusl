@@ -14,6 +14,8 @@ pub struct Options {
     pub name: NameOptions,
     #[serde(default)]
     pub content: ContentOptions,
+    #[serde(default)]
+    pub size: SizeOptions,
 }
 
 impl Default for Options {
@@ -25,6 +27,7 @@ impl Default for Options {
             content_history: vec![],
             name: Default::default(),
             content: Default::default(),
+            size: Default::default(),
         }
     }
 }
@@ -81,10 +84,49 @@ pub enum Sort {
     Extension,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Default)]
+pub enum SizeCompare {
+    #[default]
+    None,
+    GreaterThanOrEqualTo,
+    LessThan,
+    EqualTo,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct SizeOptions {
+    #[serde(default)]
+    pub operator: SizeCompare,
+    #[serde(default)]
+    pub bytes: u64,
+}
+
 #[derive(PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Debug, Default)]
 pub enum FTypes {
     Files,
     Directories,
     #[default]
     All,
+}
+
+impl From<String> for SizeCompare {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            ">=" => SizeCompare::GreaterThanOrEqualTo,
+            "<" => SizeCompare::LessThan,
+            "=" => SizeCompare::EqualTo,
+            _ => SizeCompare::None,
+        }
+    }
+}
+
+impl SizeCompare {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SizeCompare::None => "None",
+            SizeCompare::GreaterThanOrEqualTo => ">=",
+            SizeCompare::LessThan => "<",
+            SizeCompare::EqualTo => "=",
+        }
+    }
 }

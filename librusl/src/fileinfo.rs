@@ -9,6 +9,7 @@ pub struct FileInfo {
     pub ext: String,
     pub name: String,
     pub is_folder: bool,
+    pub file_size: u64,
     pub plugin: Option<ExtendedType>,
     pub ranges: Vec<std::ops::Range<usize>>, //TODO: save ranges for highlighting
 }
