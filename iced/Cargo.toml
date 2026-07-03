@@ -13,6 +13,7 @@ formato = "0.3"                                              #for thousands
 serde = { version = "1.0", features = ["derive"] }           #for saving config 
 toml = "1.1.2"                                               #for saving config
 dirs = "6"                                                   #for saving config
+tokio = { version = "1", features = ["time"] }               #for delay
 
 [build-dependencies]
 embed-resource = "3.0" #for icon

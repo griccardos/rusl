@@ -9,6 +9,8 @@ use librusl::{
     search::Search,
 };
 
+const MAX_DETAIL_LINES: usize = 100;
+
 const BOLD: Font = Font {
     family: Family::SansSerif,
     weight: Bold,
@@ -83,6 +85,8 @@ struct App {
     gui_options: GuiOptions,
     size_compare: String,
     size_value: String,
+    show_clipboard_copied: bool,
+    expanded: HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -96,6 +100,9 @@ pub enum Message {
     Event(iced::event::Event),
     CopyAllToClipboard,
     CopySingleToClipboard(String),
+    ClearClipboardMessage,
+    ToggleExpand(String),
+    ToggleExpandAll,
     ToggleErrors,
     ToggleSettings,
     Settings(SettingsMessage),
@@ -162,6 +169,8 @@ impl App {
             gui_options,
             size_compare: ops.size.operator.as_str().to_string(),
             size_value: "".to_string(),
+            show_clipboard_copied: false,
+            expanded: HashSet::new(),
         };
         (d, focus_next())
     }
@@ -179,10 +188,17 @@ impl App {
             .on_input(Message::ContentsChanged)
             .padding(4)
             .on_submit(Message::FindPressed);
+        let copied_label = if self.show_clipboard_copied { "Copied to clipboard" } else { "" };
         let clipboard = if self.display_results.is_empty() {
             Container::new(Text::new(""))
         } else {
-            Container::new(Button::new(Text::new("Clipboard")).on_press(Message::CopyAllToClipboard))
+            Container::new(
+                Row::new()
+                    .spacing(8)
+                    .align_y(Alignment::Center)
+                    .push(Button::new(Text::new("Clipboard")).on_press(Message::CopyAllToClipboard))
+                    .push(Text::new(copied_label).color(Color::from_rgb8(150, 150, 150))),
+            )
         };
         let dir = TextInput::new("", &self.directory)
             .on_input(Message::DirectoryChanged)
@@ -192,7 +208,6 @@ impl App {
             self.display_results
                 .iter()
                 .map(|x| -> Element<'_, Message> {
-                    let max = 100;
                     let maxlen = 200;
 
                     let mut rts: Vec<Span> = vec![];
@@ -215,6 +230,20 @@ impl App {
                         rts.push(span(plugin_label).color(Color::from_rgb8(18, 110, 171)));
                     }
                     let rt = rich_text(rts);
+
+                    let is_expanded = self.expanded.contains(&x.path);
+                    let has_matches = !x.matches.is_empty();
+                    let show_arrow = !self.contents.is_empty() && has_matches;
+                    let arrow: Element<'_, Message> = if x.path.starts_with("...") || !show_arrow {
+                        container(text!(" ")).width(Length::Fixed(12.)).align_x(Alignment::Center).into()
+                    } else {
+                        let arrow_text = if is_expanded { "▼" } else { "▶" };
+                        mouse_area(container(text!("{}", arrow_text)).width(Length::Fixed(12.)).align_x(Alignment::Center))
+                            .on_press(Message::ToggleExpand(x.path.clone()))
+                            .interaction(mouse::Interaction::Pointer)
+                            .into()
+                    };
+
                     let icon = if x.path.starts_with("...") {
                         text!("")
                     } else if x.is_folder {
@@ -222,61 +251,59 @@ impl App {
                     } else {
                         text!("📝")
                     };
-                    let icon = tooltip(
-                        mouse_area(icon).on_press(Message::CopySingleToClipboard(x.path.clone())),
-                        container("Click to copy path to clipboard").padding(10).style(container::rounded_box),
-                        tooltip::Position::Right,
-                    );
+                    let icon = container(icon);
                     let show_size = self.size_compare != "None" && !self.size_value.is_empty();
-                    let size_label = if x.path.starts_with("...") {
-                        Container::new(text!(""))
-                    } else if show_size {
+                    let size_label = if show_size {
                         Container::new(text!("{}", format_size(x.file_size)).color(Color::from_rgb8(150, 150, 150)))
                             .width(Length::Fixed(60.))
                             .align_x(Alignment::End)
                     } else {
                         Container::new(text!(""))
                     };
-                    let row = Row::new().spacing(10).push(icon).push(size_label).push(rt);
+                    let row = Row::new().spacing(5).push(icon).push(size_label).push(rt);
+                    let row = mouse_area(row)
+                        .on_press(Message::CopySingleToClipboard(x.path.clone()))
+                        .interaction(mouse::Interaction::Pointer);
+                    let row = Row::new().spacing(4).push(arrow).push(row);
 
                     let mut col = Column::new().push(row);
 
-                    //content matches
-                    for cline in x.matches.iter().take(max) {
-                        let line_font = BOLD;
-                        let mut cspans: Vec<Span> = vec![span(format!("{}: ", cline.line)).color(Color::from_rgb8(17, 122, 13)).font(line_font)];
-                        let mut last = 0;
-                        //careful of char boudaries
-                        let mut cutoff = cline.content.len().min(maxlen);
-                        while cutoff > 0 && cutoff != cline.content.len() && !cline.content.is_char_boundary(cutoff) {
-                            cutoff -= 1;
-                        }
-                        let text = &cline.content[..cutoff];
-
-                        for range in &cline.ranges {
-                            if range.start > text.len() || range.end > text.len() {
-                                break;
+                    //content matches (only when expanded)
+                    if is_expanded {
+                        for cline in x.matches.iter().take(MAX_DETAIL_LINES) {
+                            let line_font = BOLD;
+                            let mut cspans: Vec<Span> = vec![span(format!("{}: ", cline.line)).color(Color::from_rgb8(17, 122, 13)).font(line_font)];
+                            let mut last = 0;
+                            //careful of char boudaries
+                            let mut cutoff = cline.content.len().min(maxlen);
+                            while cutoff > 0 && cutoff != cline.content.len() && !cline.content.is_char_boundary(cutoff) {
+                                cutoff -= 1;
                             }
-                            cspans.push(span(text[last..range.start].to_owned()).color(Color::from_rgb8(200, 200, 200)));
-                            let match_font = BOLD;
-                            cspans.push(
-                                span(text[range.start..range.end].to_owned())
-                                    .color(Color::from_rgb8(255, 0, 0))
-                                    .font(match_font),
-                            );
-                            last = range.end;
+                            let text = &cline.content[..cutoff];
+
+                            for range in &cline.ranges {
+                                if range.start > text.len() || range.end > text.len() {
+                                    break;
+                                }
+                                cspans.push(span(text[last..range.start].to_owned()).color(Color::from_rgb8(200, 200, 200)));
+                                let match_font = BOLD;
+                                cspans.push(
+                                    span(text[range.start..range.end].to_owned())
+                                        .color(Color::from_rgb8(255, 0, 0))
+                                        .font(match_font),
+                                );
+                                last = range.end;
+                            }
+                            cspans.push(span(text[last..].to_string()).color(Color::from_rgb8(200, 200, 200)));
+                            let content = rich_text(cspans);
+                            col = col.push(content);
                         }
-                        cspans.push(span(text[last..].to_string()).color(Color::from_rgb8(200, 200, 200)));
-                        let content = rich_text(cspans);
-                        col = col.push(content);
+                        if x.matches.len() > MAX_DETAIL_LINES {
+                            col = col.push(
+                                Text::new(format!("... and {} more", x.matches.len() - MAX_DETAIL_LINES)).color(Color::from_rgb8(200, 200, 200)),
+                            );
+                        }
                     }
-                    if x.matches.len() > max {
-                        col = col.push(Text::new(format!("... and {} more", x.matches.len() - max)).color(Color::from_rgb8(200, 200, 200)));
-                    }
-                    // if !content.is_empty() {
-                    //     let details = Text::new(content).width(Length::Fill).color(Color::from_rgb8(200, 200, 200));
-                    //     col = col.push(details);
-                    // }
                     Row::new().spacing(10).push(col).into()
                 })
                 .collect::<Vec<_>>(),
@@ -436,7 +463,7 @@ impl App {
                 Row::new()
                     .spacing(20)
                     .align_y(Alignment::Center)
-                    .push(Row::new().push(Button::new(Text::new("Settings")).on_press(Message::ToggleSettings)))
+                    .push(Button::new(Text::new("Settings")).on_press(Message::ToggleSettings))
                     .push(text("File Types:").font(BOLD))
                     .push(
                         Row::new()
@@ -478,7 +505,7 @@ impl App {
                 } else {
                     &format!("{} errors", error_count)
                 };
-                if error_count > 0 {
+                let error_btn = if error_count > 0 {
                     let c: Element<'_, Message> = Container::new(Button::new(Text::new(label.to_string())).on_press(Message::ToggleErrors))
                         .style(container::rounded_box)
                         .into();
@@ -486,7 +513,36 @@ impl App {
                 } else {
                     let c: Element<'_, Message> = Container::new(Text::new("")).into();
                     c
-                }
+                };
+                let expand_btn = if self.contents.is_empty() || self.display_results.is_empty() {
+                    let c: Element<'_, Message> = Container::new(Text::new("")).into();
+                    c
+                } else {
+                    let any_expanded = self.display_results.iter().any(|x| self.expanded.contains(&x.path));
+                    let expand_label = if any_expanded { "Collapse all" } else { "Expand all" };
+                    let c: Element<'_, Message> = Container::new(Button::new(Text::new(expand_label)).on_press(Message::ToggleExpandAll)).into();
+                    c
+                };
+                let showing = if self.display_results.len() > 0 {
+                    let mut display_text = format!("Showing {}", self.display_results.len().formato("N0"));
+                    let others = self.full_results.len() - self.display_results.len();
+                    if others > 0 {
+                        display_text.push_str(&format!(". There are {} more", others.formato("N0")));
+                    }
+
+                    text(display_text)
+                } else {
+                    text("")
+                };
+
+                let c: Element<'_, Message> = Row::new()
+                    .spacing(10)
+                    .align_y(Alignment::Center)
+                    .push(error_btn)
+                    .push(expand_btn)
+                    .push(showing)
+                    .into();
+                c
             })
             .push(if self.showing_errors && !self.errors.is_empty() {
                 let c: Element<'_, Message> = scrollable(Column::with_children(
@@ -546,22 +602,23 @@ impl App {
                     match res {
                         SearchResult::FinalResults(res) => {
                             self.searching = false;
-                            let data_len = res.data.len();
-                            let display_count = data_len.min(self.gui_options.display_limit);
-                            self.display_results = res.data.iter().take(display_count).cloned().collect();
-                            self.full_results = res.data;
-                            if data_len > self.gui_options.display_limit {
-                                self.display_results.push(FileInfo {
-                                    path: format!("...and {} others", data_len - self.gui_options.display_limit),
-                                    matches: vec![],
-                                    ext: "".into(),
-                                    name: "".into(),
-                                    is_folder: false,
-                                    file_size: 0,
-                                    plugin: None,
-                                    ranges: vec![],
-                                });
+                            //we take while path+num lines <display_limit
+                            let mut display_lines = 0;
+                            self.display_results.clear();
+                            for rd in &res.data {
+                                self.display_results.push(rd.clone());
+                                display_lines += 1 + rd.matches.len().min(MAX_DETAIL_LINES);
+                                if display_lines >= self.gui_options.display_limit {
+                                    break;
+                                }
                             }
+                            self.full_results = res.data;
+                            if !self.contents.is_empty() {
+                                self.expanded = self.display_results.iter().map(|x| x.path.clone()).collect();
+                            } else {
+                                self.expanded.clear();
+                            }
+
                             let filecount = self.full_results.iter().filter(|x| !x.is_folder).count();
                             let foldercount = self.full_results.len() - filecount;
                             let mut msg = String::new();
@@ -598,11 +655,15 @@ impl App {
                         SearchResult::InterimResult(res) => {
                             //only pick up messages if searching (have not found final result) so we dont update ui unnecessarily
                             if self.searching {
-                                if self.display_results.len() < self.gui_options.display_limit {
-                                    self.display_results.push(res.clone())
+                                if self.interim_count < self.gui_options.display_limit {
+                                    self.display_results.push(res.clone());
+                                    if !res.matches.is_empty() && !self.contents.is_empty() {
+                                        self.expanded.insert(res.path.clone());
+                                    }
                                 }
+                                let this_count = 1 + res.matches.len().min(MAX_DETAIL_LINES); //this is file+number of details
                                 self.full_results.push(res);
-                                self.interim_count += 1;
+                                self.interim_count += this_count;
                                 self.found += 1;
                                 self.message = format!(
                                     "Found {} in {} files and folders. Searching...",
@@ -648,12 +709,47 @@ impl App {
 
             Message::CopyAllToClipboard => {
                 let text = self.full_results.iter().map(|x| x.path.clone()).collect::<Vec<_>>().join("\n");
-                self.message = "Copied to clipboard".to_string();
-                return iced::clipboard::write(text);
+                self.show_clipboard_copied = true;
+                return Task::batch(vec![
+                    iced::clipboard::write(text),
+                    Task::perform(
+                        async {
+                            tokio::time::sleep(Duration::from_millis(1500)).await;
+                        },
+                        |_| Message::ClearClipboardMessage,
+                    ),
+                ]);
             }
             Message::CopySingleToClipboard(path) => {
-                self.message = "Copied to clipboard".to_string();
-                return iced::clipboard::write(path);
+                self.show_clipboard_copied = true;
+                return Task::batch(vec![
+                    iced::clipboard::write(path),
+                    Task::perform(
+                        async {
+                            tokio::time::sleep(Duration::from_millis(1500)).await;
+                        },
+                        |_| Message::ClearClipboardMessage,
+                    ),
+                ]);
+            }
+            Message::ClearClipboardMessage => self.show_clipboard_copied = false,
+
+            Message::ToggleExpand(path) => {
+                if self.expanded.contains(&path) {
+                    self.expanded.remove(&path);
+                } else {
+                    self.expanded.insert(path);
+                }
+            }
+            Message::ToggleExpandAll => {
+                let others_label = self.display_results.last().map_or(false, |a| a.path.starts_with("...and")) as usize;
+                let total = self.display_results.len() - others_label;
+                let count_expanded = self.expanded.len();
+                if count_expanded < total {
+                    self.expanded = self.display_results.iter().map(|x| x.path.clone()).collect();
+                } else {
+                    self.expanded.clear();
+                }
             }
             Message::ToggleErrors => {
                 self.showing_errors = !self.showing_errors;
@@ -802,6 +898,7 @@ pub fn checkbox<'a>(label: &'a str, checked: bool) -> MyCheckbox<'a> {
 }
 
 use std::{
+    collections::HashSet,
     sync::mpsc::{Receiver, channel},
     time::Duration,
 };
@@ -813,13 +910,13 @@ use iced::{
     event,
     font::{Family, Stretch, Style, Weight::Bold},
     keyboard::{Event, Key, key::Named},
+    mouse,
     theme::Base,
     widget::{
         Button, Column, Container, Row, Space, Text, TextInput, container, mouse_area,
         operation::{focus_next, focus_previous},
         pick_list, radio, rich_text, scrollable, span, text,
         text::Span,
-        tooltip,
     },
     window::{self, icon},
 };
